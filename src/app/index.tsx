@@ -1,98 +1,94 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { runSelfTest } from '@/faceauth/ort';
 
 export default function HomeScreen() {
+  const [lines, setLines] = useState<string[]>([]);
+  const [running, setRunning] = useState(false);
+
+  const run = async (): Promise<void> => {
+    setRunning(true);
+    setLines([]);
+    const result = await runSelfTest();
+    setLines(result);
+    setRunning(false);
+  };
+
+  const passed = lines.some((l) => l.includes('ALL 3 MODELS'));
+  const failed = lines.some((l) => l.startsWith('❌'));
+  const badgeStyle = passed ? styles.pass : failed ? styles.fail : styles.pending;
+  const badgeLabel = running ? 'RUNNING…' : passed ? 'PASS ✅' : failed ? 'FAIL ❌' : '…';
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
+        <View style={styles.hero}>
           <AnimatedIcon />
           <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
+            Datalake FaceAuth
           </ThemedText>
-        </ThemedView>
+          <ThemedText type="small" style={styles.subtitle}>
+            On-device model self-test (Slice 1)
+          </ThemedText>
+        </View>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        <Pressable
+          style={({ pressed }) => [styles.cta, (running || pressed) && styles.ctaPressed]}
+          onPress={() => void run()}
+          disabled={running}
+        >
+          <Text style={styles.ctaText}>{running ? 'Running…' : '▶  Run on-device model self-test'}</Text>
+        </Pressable>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+        {(lines.length > 0 || running) && (
+          <View style={[styles.badge, badgeStyle]}>
+            <Text style={styles.badgeText}>{badgeLabel}</Text>
+          </View>
+        )}
 
-        {Platform.OS === 'web' && <WebBadge />}
+        <ScrollView style={styles.log} contentContainerStyle={styles.logContent}>
+          {lines.map((l, i) => (
+            <Text key={i} style={styles.logLine} selectable>
+              {l}
+            </Text>
+          ))}
+          {running ? <ActivityIndicator style={{ marginTop: 12 }} color="#CDE7FF" /> : null}
+        </ScrollView>
       </SafeAreaView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
+  container: { flex: 1, alignItems: 'center' },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
     alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.four,
+    paddingBottom: Spacing.four,
+    gap: Spacing.three,
+    maxWidth: MaxContentWidth,
+    width: '100%',
   },
+  hero: { alignItems: 'center', gap: Spacing.two, paddingTop: Spacing.three },
+  title: { textAlign: 'center' },
+  subtitle: { textAlign: 'center' },
+  cta: { backgroundColor: '#2563EB', paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
+  ctaPressed: { opacity: 0.6 },
+  ctaText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  badge: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999 },
+  pending: { backgroundColor: '#94A3B8' },
+  pass: { backgroundColor: '#16A34A' },
+  fail: { backgroundColor: '#DC2626' },
+  badgeText: { color: '#FFFFFF', fontWeight: '700' },
+  log: { flex: 1, backgroundColor: '#0B1B33', borderRadius: 16, padding: 14 },
+  logContent: { gap: 6 },
+  logLine: { color: '#CDE7FF', fontFamily: 'Menlo', fontSize: 12 },
 });
