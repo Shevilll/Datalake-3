@@ -1,0 +1,7 @@
+# §6 verification harness — pinned for a Python 3.12 venv (see DECISIONS.md D6).
+# System Python is 3.14, which lacks onnxruntime/opencv wheels; do NOT use it.
+#   uv venv --python 3.12 harness/.venv && source harness/.venv/bin/activate
+#   pip install -r harness/requirements.txt
+onnxruntime>=1.17,<2.0
+opencv-python>=4.9,<5.0
+numpy>=1.26,<3.0
