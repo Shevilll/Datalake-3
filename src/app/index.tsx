@@ -20,7 +20,8 @@ import {
   satisfiesChallenge,
 } from '@/faceauth/activeLiveness';
 import { photoToMat } from '@/faceauth/capture';
-import { addEnrollment, listEnrolled, purgeAll } from '@/faceauth/gallery';
+import { FaceAuth } from '@/faceauth/FaceAuth';
+import { addEnrollment, listEnrolled } from '@/faceauth/gallery';
 import { loadSessions, type Sessions } from '@/faceauth/ort';
 import { enrollFromMat, verifyFromMat } from '@/faceauth/pipeline';
 
@@ -158,6 +159,15 @@ export default function HomeScreen() {
         setResult(`❌ No match (best cos ${cos}, ${out.latencyMs}ms)`);
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
+      // Audit record — never raw images; embedding + outcome only (§10 / C8).
+      void FaceAuth.queueForSync({
+        id: `evt-${Date.now()}`,
+        personId: verified ? out.personId : null,
+        timestamp: Date.now(),
+        matched: out.matched,
+        confidence: out.confidence,
+        livenessPassed: satisfied,
+      });
     } catch (e) {
       setResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
       push(`verify error: ${e instanceof Error ? e.message : String(e)}`);
@@ -167,11 +177,27 @@ export default function HomeScreen() {
     }
   };
 
-  const handlePurge = (): void => {
-    const n = purgeAll();
+  const handlePurge = async (): Promise<void> => {
+    // Wipes embeddings + sync queue + transmit log — the C8 "purge all biometric data" primitive.
+    const { purged } = await FaceAuth.purgeLocal();
     setEnrolled(listEnrolled());
-    setResult(`Purged ${n} enrolled identities`);
-    push(`purged ${n}`);
+    setResult(`Purged ${purged} local records (gallery + sync queue + log)`);
+    push(`purgeLocal: ${purged}`);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
+  const handleSync = async (): Promise<void> => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { synced } = await FaceAuth.syncNow();
+      setResult(synced > 0 ? `Synced ${synced} record${synced === 1 ? '' : 's'} (see Metro log for payload)` : 'Sync queue is empty');
+      push(`syncNow: ${synced}`);
+    } catch (e) {
+      push(`sync error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -252,9 +278,14 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <Pressable style={styles.purge} onPress={handlePurge} disabled={busy}>
-            <Text style={styles.purgeText}>Purge gallery</Text>
-          </Pressable>
+          <View style={styles.linksRow}>
+            <Pressable onPress={() => void handleSync()} disabled={busy} style={styles.linkBtn}>
+              <Text style={styles.syncText}>Sync queue</Text>
+            </Pressable>
+            <Pressable onPress={() => void handlePurge()} disabled={busy} style={styles.linkBtn}>
+              <Text style={styles.purgeText}>Purge all</Text>
+            </Pressable>
+          </View>
         </GlassView>
       </SafeAreaView>
 
@@ -320,7 +351,9 @@ const styles = StyleSheet.create({
   verify: { backgroundColor: '#2563EB' },
   btnDisabled: { opacity: 0.5 },
   btnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  purge: { alignItems: 'center', paddingVertical: 8 },
+  linksRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 4 },
+  linkBtn: { paddingVertical: 6, paddingHorizontal: 8 },
+  syncText: { color: '#2563EB', fontWeight: '600' },
   purgeText: { color: '#DC2626', fontWeight: '600' },
   busy: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
 });
