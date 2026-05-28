@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, useCameraDevice, useCameraPermission, usePhotoOutput } from 'react-native-vision-camera';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import * as Haptics from 'expo-haptics';
 
 import {
   type ActiveChallenge,
@@ -100,6 +101,7 @@ export default function HomeScreen() {
       const sc = out.detection?.score.toFixed(2);
       setResult(`Registered "${name.trim()}" — sample #${count} (det ${sc})`);
       push(`enrolled ${name.trim()} #${count} det=${sc}`);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (e) {
       setResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
       push(`register error: ${e instanceof Error ? e.message : String(e)}`);
@@ -148,10 +150,13 @@ export default function HomeScreen() {
       push(`verify matched=${out.matched} sat=${satisfied} verified=${verified} cos=${cos} yaw=${yaw} smile=${smile} live=${live} (${out.latencyMs}ms)`);
       if (verified) {
         setResult(`✅ ${out.personId} — verified (${challengePrompt(challenge)} ✓, cos ${cos}, ${out.latencyMs}ms)`);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else if (out.matched && !satisfied) {
         setResult(`❌ Challenge failed — ${challengePrompt(challenge)} (yaw ${yaw}, smile ${smile}, ${out.latencyMs}ms)`);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       } else {
         setResult(`❌ No match (best cos ${cos}, ${out.latencyMs}ms)`);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } catch (e) {
       setResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
