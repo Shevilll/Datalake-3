@@ -75,7 +75,7 @@ The pivots that made the project work — `DECISIONS.md` is the audit trail:
 - **D8** — recognition model: MIT-licensed MobileFaceNet, exported from `caojingtian1216` (validated discriminative on sample faces).
 - **D9** — v1 uses no custom native code; Vision Camera 5 + fast-opencv + ORT-RN run the whole pipeline.
 - **D10** — challenge selection uses a CSPRNG (anti-replay); polyfill batched into the next native build.
-- **D11** — **active gesture is the binding liveness signal**; passive MiniFASNet is informational defense-in-depth, because on modern iPhone selfies it saturates regardless of input. Honest, defensible.
+- **D11** — **active gesture is the binding liveness signal** (CSPRNG-randomized; defeats both photo and replay). Passive MiniFASNet was measured on real iPhone selfies AND 2D photos from the same pipeline and saturates on both — it doesn't discriminate on this device's camera distribution. We surface its score in `VerifyResult.passiveScore` as a **transparency / extensibility hook** so production can drop in a stronger fused passive model without touching the FaceAuth contract; we do NOT hard-gate on it.
 - **D4** — int8 quantization is the headline compression (4.80 → 1.36 MB); fp16 is the zero-loss fallback.
 
 ## License

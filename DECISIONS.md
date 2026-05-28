@@ -17,7 +17,7 @@
   - Prompt is labelled "Blink twice (bonus)" so the user + judges see this is the optional one.
 - **Result:** brief's example list is fully covered (blink + smile + head-turn all visible); the binding security property is unchanged; stage demo can't false-reject on a noisy proxy.
 
-## D11 — 2026-05-28 — Slice 2 fusion lock: active is the binding liveness signal; passive is informational defense-in-depth
+## D11 — 2026-05-28 — Slice 2 fusion lock: active is the binding liveness signal; passive is exposed as a transparency / extensibility hook (not a gate)
 
 - **Trigger:** on-device passive testing showed MiniFASNet-V2 saturates to class 2 (replay)
   with p≈0.99 for **both** 2D photos and live iPhone-front-camera selfies — i.e. it doesn't
@@ -37,9 +37,13 @@
   With enrollment covering **frontal + slight-turn + smiling** samples (3–5 shots), all three
   active challenges verify reliably: cos 0.79–0.86, latency ~128–141 ms, directional intent
   correctly enforced (`sat=true` only when the user turns in the prompted direction).
-- **Honest pitch framing:** "Active gesture is the binding liveness; passive is documented
-  defense-in-depth and demonstrably rejects nothing on this single MiniFASNet-V2 export — in
-  production we'd swap or fuse two passive models per the upstream Silent-Face design."
+- **Honest pitch framing:** "Active gesture is the binding liveness signal — it defeats both
+  photo and replay (the printed photo can't perform the prompted gesture; the recorded video
+  can't match an unpredictable CSPRNG-picked prompt). Passive runs and we surface its score
+  in `VerifyResult.passiveScore` as a transparency / extensibility hook, but it's NOT a gate
+  — we measured this single MiniFASNet-V2 export and it saturates on both live and 2D inputs
+  from this device's camera distribution; in production we'd swap or fuse two passive models
+  per Silent-Face's upstream design without touching the FaceAuth contract."
 - **Status:** Slice 2 functionally complete. Slice 5 gallery accuracy + Android validation
   finalize the τ_match and any threshold drift.
 

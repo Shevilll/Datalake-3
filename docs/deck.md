@@ -1,10 +1,41 @@
-# Datalake FaceAuth — Hackathon 7.0 Deck
-
-> Slide-by-slide content. Each `---` is a slide boundary. Drop into PowerPoint / Keynote / Google Slides; speaker notes are flagged with **Notes:** and visual cues with **Visual:**. ~12 slides, ~7–9 minute pitch.
-
+---
+marp: true
+theme: default
+paginate: true
+size: 16:9
+header: 'Datalake FaceAuth · Hackathon 7.0'
+footer: 'Shevilll · NHAI Hackathon 7.0 · 2026'
+style: |
+  section {
+    font-family: 'SF Pro', 'Inter', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #F4F7FC 0%, #FFF5F0 100%);
+    color: #0B1B33;
+    padding: 56px 64px;
+  }
+  section.lead { text-align: center; }
+  section.lead h1 { font-size: 2.2em; letter-spacing: -0.02em; }
+  h1, h2, h3 { color: #0B1B33; letter-spacing: -0.01em; }
+  h1 { font-size: 1.75em; }
+  h2 { font-size: 1.4em; margin-top: 0; }
+  strong { color: #007AFF; }
+  table { font-size: 0.78em; border-collapse: collapse; }
+  th { background: rgba(0,122,255,0.10); }
+  th, td { padding: 6px 10px; border-bottom: 1px solid rgba(11,27,51,0.10); }
+  code { background: rgba(11,27,51,0.06); padding: 1px 5px; border-radius: 4px; font-size: 0.88em; }
+  pre { background: rgba(11,27,51,0.04); border-radius: 8px; padding: 12px; font-size: 0.72em; }
+  blockquote { border-left: 4px solid #007AFF; padding-left: 12px; color: #48566B; font-style: italic; }
 ---
 
-## 1. Datalake FaceAuth
+<!--
+Datalake FaceAuth — Hackathon 7.0 Deck. Slide-by-slide content; each `---` is a slide boundary.
+Convert with: `marp deck.md -o deck.pptx` (or `-o deck.pdf`) using the Marp CLI.
+**Notes:** are speaker notes; **Visual:** are screenshot/illustration cues.
+~12 slides, ~7–9 minute pitch.
+-->
+
+<!-- _class: lead -->
+
+# Datalake FaceAuth
 
 ### Offline facial recognition + liveness for field personnel in zero-network zones
 
@@ -47,7 +78,7 @@ NHAI field staff authenticate at remote sites with **no network**. Existing opti
 | End-to-end verify (rubric Android) | < 1 s | _pending Android validation_ |
 | Same-identity cosine separation margin | discriminative | **0.89–0.95** (sample faces, int8/fp32) |
 | On-device same-id cosine (live captures) | — | 0.79–0.86 across pose with multi-shot enrollment |
-| Liveness defense | photo + replay | active randomized gesture (binding) + passive defense-in-depth |
+| Liveness defense | photo + replay | **CSPRNG-randomized active gesture (binding)** — defeats both; passive MiniFASNet exposed as a transparency / extensibility hook (D11) |
 | Licensing | open-source only | YuNet **MIT** · MiniFASNet-V2 **Apache-2.0** · recognition **MIT** (our export) |
 
 **Visual:** big numbers (3.33 MB, ~130 ms, 0.95) as a hero card.
@@ -114,22 +145,26 @@ NHAI field staff authenticate at remote sites with **no network**. Existing opti
 
 ---
 
-## 6. Innovation: dual liveness — active gesture (binding) + passive (defense-in-depth)
+## 6. Innovation: anti-spoofing — CSPRNG-randomized active gesture defeats photo and replay
 
-**Two layers, fused honestly:**
+**The binding signal — the only thing the verdict gates on:**
 
-1. **Active randomized challenge** — `headLeft / headRight / smile` (binding) + `blink` (bonus, non-binding), **CSPRNG-picked** per verify, geometry-verified from YuNet's 5 landmarks (yaw proxy + mouth-corner spread + eye-open proxy for the bonus). All three brief examples — *blink, smile, or turn their head* — are surfaced.
-2. **Passive MiniFASNet** — runs on every verify, reported in the result. *Informational only on this device class* (saturates on modern iPhone selfies — disclosed in DECISIONS.md D11).
+A CSPRNG-randomized active gesture, picked unpredictably per verify from `headLeft` / `headRight` / `smile` (binding) + `blink` (bonus, non-binding). Geometry verified from YuNet's 5 landmarks (yaw proxy + mouth-corner spread). All three brief examples — *blink, smile, or turn their head slightly* — are surfaced.
 
-**Fusion rule:** `verified = matched AND binding-active-challenge-satisfied`. Bonus prompts (blink) auto-pass to avoid false-rejecting a real user on a noisy single-shot proxy (D12).
+**Fusion rule:** `verified = matched AND binding-active-challenge-satisfied`.
 
-**What this defeats:**
-- **Printed / screen photo:** a flat photo can't smile or turn on command → active fails.
-- **Replayed video:** the challenge is CSPRNG-randomized per verify → attacker can't pre-position the right pre-recorded gesture.
+**What this defeats — and the live-demo plan that proves it:**
 
-**Honest framing:** "We measured passive on real iPhone selfies; the single MiniFASNet export saturates regardless of input. We documented it transparently and made active the binding signal. Production would fuse two passive models per Silent-Face's design or swap a stronger passive model — the integration point is ready."
+| Attack | Why it fails | Live demo |
+|---|---|---|
+| **Printed photo** of an enrolled subject | the photo cannot perform the prompted gesture on command — face matches, gesture fails | hold a printed photo to the camera → `Verify` → `❌ Challenge failed` on every attempt |
+| **Replayed video** of the subject sitting neutrally | the recording shows no gesture; the prompt is unpredictable per verify so the attacker can't pre-position the right gesture either | play a still-frame / neutral video on a second phone → `Verify` → `❌ Challenge failed` |
 
-**Notes:** "Most teams will ship active-only OR will hard-gate on passive without measuring it. We measured, documented honestly, and chose the design that actually works."
+**Passive MiniFASNet — exposed as a transparency / extensibility hook, NOT a binding gate.** We measured the single MiniFASNet-V2 export on real iPhone-front-camera selfies and a 2D press photo from the same pipeline: it saturates to the same score on both — it doesn't discriminate on this device's camera distribution (D11, `docs/benchmarks.md` §4). We surface the score in `VerifyResult.passiveScore` for honesty and so a production deployment can drop in a stronger model (Silent-Face's two-model fused design, or a newer export) **without changing the FaceAuth contract or any other code**. Hard-gating on this single export would lock real users out — that's not a trade we'll defend.
+
+**Stronger replay guarantee already in the API:** `randomChallengeSequence(n)` raises per-attempt entropy to `n × log₂(3) ≈ 1.58n` bits. At `n=2` blind-guess success drops to **(1/3)² ≈ 11%** — wire when the deployment context wants it.
+
+**Notes:** "Most teams will ship active-only and not say so, OR hard-gate on passive without ever testing whether it discriminates. We did the test, kept passive in the pipeline as a transparency hook, and made active the binding signal that actually works. The demo will show printed-photo defeat and neutral-video-replay defeat — both fail on the gesture, not on a black-box score we can't justify."
 
 ---
 
@@ -224,11 +259,12 @@ await FaceAuth.purgeLocal(); // wipes embeddings + queue + transmit log
 
 1. **Register Ahmad** — capture 4–5 shots with slight pose variation (frontal, slight left, slight right, smile). Top pill shows "1 enrolled".
 2. **Verify** — tap → randomized challenge prompt appears in the Liquid Glass banner ("Turn slightly LEFT", "Smile", or occasionally the bonus "Blink twice"). Perform → Capture → result panel: `✅ Ahmad — verified (cos 0.8x, ~130 ms)` + a **Success** haptic. The bonus blink prompt makes the brief's full example list — blink/smile/turn — visibly covered (D12).
-3. **Defeat #1 — printed/screen photo:** point camera at a phone showing Ahmad's photo → cosine matches BUT no commanded gesture → `❌ Challenge failed`.
-4. **Defeat #2 — wrong direction:** turn the wrong way for the prompted challenge → `❌ Challenge failed` even though face matches. Randomization defeats pre-recorded replays.
-5. **Sync & Purge** (live from the bottom panel): tap **Sync queue** → mock POST payload prints in Metro (no raw images, just `id / personId / timestamp / matched / confidence / livenessPassed`). Tap **Purge all** → wipes the encrypted gallery + sync queue + transmit log in one call; subsequent verify returns no match.
+3. **Defeat #1 — printed photo:** hold a printed photo of Ahmad to the camera → cosine matches the enrolled face BUT the flat photo can't perform the prompted gesture → `❌ Challenge failed`. Runs cleanly on every attempt regardless of which gesture the CSPRNG picks.
+4. **Defeat #2 — replayed neutral video:** play a still-frame / neutral-sitting video of Ahmad on a second phone → cosine matches BUT the recording shows no on-demand gesture → `❌ Challenge failed`. The CSPRNG randomization closes the predict-and-pre-record loophole.
+5. **Sanity check — directional intent:** turn the wrong way for the prompted challenge (e.g. prompt says "RIGHT", turn LEFT) → `❌ Challenge failed` even though identity matches. Demonstrates that the system enforces direction, not just movement.
+6. **Sync & Purge** (live from the bottom panel): tap **Sync queue** → mock POST payload prints in Metro (no raw images, just `id / personId / timestamp / matched / confidence / livenessPassed`). Tap **Purge all** → wipes the encrypted gallery + sync queue + transmit log in one call; subsequent verify returns no match.
 
-**Visual:** rehearsed; ~90 seconds. Have a printed photo of yourself or a second phone ready for defeat #1.
+**Visual:** rehearsed; ~90 seconds. Have ready: (a) a printed photo of yourself for Defeat #1, (b) a second phone with a 10-sec neutral video of yourself for Defeat #2.
 
 **Notes:** "We've already iterated this loop dozens of times — the demo is what we've been running for two weeks."
 
@@ -243,7 +279,7 @@ await FaceAuth.purgeLocal(); // wipes embeddings + queue + transmit log
 | D8 | Exported our own MIT MobileFaceNet because every clean small ArcFace ONNX traced to non-commercial weights (C6). |
 | D9 | Skipped a custom Nitro plugin for v1 — Vision Camera 5 + fast-opencv + ORT-RN proved sufficient, retiring schedule risk *and* keeping Android free. |
 | D10 | CSPRNG-based challenge selection (anti-replay prediction); native polyfill batched. |
-| D11 | Discovered the single MiniFASNet export saturates on modern iPhone selfies. Pivoted to active-primary fusion, kept passive informational — disclosed honestly. |
+| D11 | Measured the single MiniFASNet export on real iPhone selfies AND 2D photos — it saturates regardless of input, so it's not a discriminator on this device's camera distribution. Removed it as a binding gate; kept it in the pipeline as a transparency / extensibility hook exposed via `VerifyResult.passiveScore` for production to drop in a stronger fused passive model without touching the FaceAuth contract. |
 | D12 | Added blink as a NON-BINDING bonus challenge so all three brief examples (blink/smile/turn) are visible, without risking a false-reject on stage from a noisy single-shot proxy that YuNet's 5 landmarks can't really support. |
 
 **Roadmap (production):**

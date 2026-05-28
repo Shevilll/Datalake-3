@@ -51,16 +51,23 @@ Internal gallery captured on-device across: harsh sun / low light / shadow / ind
 | Threshold | Value | TAR | FAR | FRR | Accuracy |
 |---|---|---|---|---|---|
 | τ_match (cosine) | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
-| τ_live (passive) | _TBD_ | — | — | — | — |
+| τ_live (passive) | n/a — not a binding gate (D11) | — | — | — | — |
 
-**Preliminary recognition sanity (harness, 2026-05-27 — not the gallery eval):** on MIT example faces, cos(same identity, flipped) = **0.92**, cos(different identities, Obama↔Biden) = **−0.03** → **0.95 separation margin**. Embedding L2-norm = 1.000; liveness softmax sums to 1.000; both 2D press photos scored passive-live = **0.000** (flat photo correctly flagged). Full gallery accuracy across lighting/demographics is the slice-5 eval that decides int8-vs-fp16 lock (D8).
+**Preliminary recognition sanity (harness, 2026-05-27 — not the gallery eval):** on MIT example faces, cos(same identity, flipped) = **0.92**, cos(different identities, Obama↔Biden) = **−0.03** → **0.95 separation margin**. Embedding L2-norm = 1.000. Full gallery accuracy across lighting/demographics is the Slice 5 eval.
+
+**Passive-liveness sanity, corrected (D11):** the harness's earlier observation that "press photos score passive-live = 0.000" looked like correct flagging in isolation, but **on-device testing of live iPhone-front-camera selfies returned the same passive-live ≈ 0** — the model saturates to class 2 (replay) regardless of input on this device's camera distribution. The 0.000 score is therefore **saturation**, not discrimination. The harness sanity check was incomplete because it never compared a live face from the same pipeline; the on-device measurement is the load-bearing one. **`τ_live` is not a binding gate in our shipped pipeline** — active gesture is (§5).
 
 ## 5. Liveness defeat demos (C7)
 
-| Attack | Defeated by | Result |
-|---|---|---|
-| Printed photo | passive MiniFASNet (`< τ_live`) | _TBD_ |
-| Replayed video | randomized active challenge timeout | _TBD_ |
+**Defeat mechanism for BOTH attacks: the CSPRNG-randomized active gesture** (`headLeft` / `headRight` / `smile`, picked unpredictably per verify; D11). Passive MiniFASNet runs and its score is surfaced in `passiveScore` for transparency / future fusion, but it is **not a binding gate** on the shipped pipeline — it saturates on this camera distribution and would block real users if hard-gated.
+
+| Attack | Defeated by | Mechanism | Expected demo outcome |
+|---|---|---|---|
+| Printed photo (or photo on a 2nd phone screen) | active CSPRNG-randomized gesture | a flat 2D photo cannot perform the prompted gesture on command (no smile, no head turn) | `❌ Challenge failed — <prompt>` on every verify attempt; recognition cosine may match (the printed face still looks like the enrolled face) but liveness fails ⇒ `verified = false` |
+| Replayed video of the enrolled subject sitting neutrally | active CSPRNG-randomized gesture | the recorded video doesn't perform the on-demand gesture; the prompt is unpredictable per verify so the attacker can't pre-position the right gesture | `❌ Challenge failed` on every attempt; for stronger guarantee, swap to `randomChallengeSequence(2)` — replay attack success drops to **(1/3)² ≈ 11%** under pure guessing (~1.6 bits of entropy per challenge, 3.17 bits for n=2) |
+| Replayed video of the subject performing one gesture (e.g. always smiling) | randomization + sequence | single-challenge verify: attacker has ~1/3 chance the prompt happens to match the recorded gesture; defeated probabilistically ⇒ require `n≥2` sequence in production for hard guarantees | `❌ Challenge failed` ~67% of attempts; 1/3 probabilistic pass is the honest disclosure — addressed by the sequenced-challenge API already shipped (`randomChallengeSequence`) |
+
+**Live-demo numbers to fill at submission:** ratio of `❌ Challenge failed` results across N=10 replay attempts of each attack class.
 
 ## 6. Memory footprint (C4 — runs in 3 GB RAM)
 
