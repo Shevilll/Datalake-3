@@ -139,7 +139,7 @@ recognition.onnx (int8) 1.36 MB   (MIT, our re-export of caojingtian1216 MobileF
 TOTAL                   3.33 MB   ← 16.5% of the C2 20 MB ceiling
 ```
 
-`recognition.fp16.onnx` (2.42 MB, bit-identical to fp32) is also produced as the accuracy-safe fallback — final lock between int8 and fp16 happens on the Slice 5 gallery eval.
+**int8 is locked as the shipped dtype** (D4, 2026-05-28) — sample-pair separation margin 0.892 vs fp32's 0.948 ≈ 6% loss, with same-id 0.897 and diff-id 0.005 still cleanly separated by more than 2× any reasonable `τ_match`. `recognition.fp16.onnx` (2.42 MB, bit-identical to fp32) is retained as a one-file swap fallback in `models/` if the Slice 5 gallery eval ever surfaces real-world drop.
 
 ## 9. What's persisted (and how)
 

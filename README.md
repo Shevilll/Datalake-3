@@ -11,7 +11,7 @@
 | Total model footprint (C2) | ≤ 20 MB (smaller is better) | **3.33 MB** (int8 build, all 3 models) |
 | End-to-end verify latency (C3) | < 1 s on mid-range device | **~130 ms** on iPhone 17 Pro Max (flagship, *functional check only*) — Android rubric number pending Slice 5 |
 | Recognition discriminativeness | > 95% | sample-face separation margin **0.95** (fp32) / **0.89** (int8); on-device same-id cosine **0.79–0.86** across pose with multi-shot enrollment |
-| Liveness (C7) | offline anti-spoofing | active gesture challenge (`headLeft / headRight / smile`) **binding**; passive MiniFASNet logged informationally |
+| Liveness (C7) | offline anti-spoofing | active gesture challenge (`headLeft / headRight / smile` binding + `blink` bonus, CSPRNG-randomized per verify); passive MiniFASNet logged informationally |
 | License (C6) | open-source only, no additional licenses | YuNet **MIT**, MiniFASNet-V2 **Apache-2.0**, recognition **MIT** (our exported MobileFaceNet) |
 | Cross-platform (C1) | iOS + Android, one codebase | Expo SDK 56 + RN 0.85 New Arch — no custom native (Vision Camera 5 + fast-opencv + ORT-RN) |
 

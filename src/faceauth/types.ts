@@ -2,9 +2,11 @@
  * Single source of truth for the FaceAuth domain types.
  * Shared by the native pipeline bridge, the JS pipeline, and UI consumers (§3b, §8).
  *
- * NOTE on the active-challenge set: per DECISIONS.md D3 we ship
- * head-turn / smile / mouth-open (all computable from YuNet's 5 landmarks),
- * and defer EAR-blink (YuNet gives eye *centers*, not eyelid contours).
+ * NOTE on the active-challenge set: per DECISIONS.md D3 / D11 the binding active
+ * gestures are head-turn (left/right) and smile — both computable from YuNet's
+ * 5 landmarks. Blink is shipped as a NON-BINDING bonus challenge (D12): the prompt
+ * is presented + a noisy single-shot proxy is reported, but the fusion verdict
+ * does not depend on it (a false-reject on stage is worse than not having blink).
  */
 
 export interface Point {
@@ -43,7 +45,7 @@ export interface LivenessResult {
   readonly probs: readonly [real: number, print: number, replay: number];
 }
 
-export type ActiveChallenge = 'headLeft' | 'headRight' | 'smile';
+export type ActiveChallenge = 'headLeft' | 'headRight' | 'smile' | 'blink';
 
 /** The result of a full verify pass — the headline object the demo + Datalake read (§8). */
 export interface VerifyResult {

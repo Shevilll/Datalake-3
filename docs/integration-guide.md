@@ -42,7 +42,7 @@ FaceAuth.setCaptureProvider(async (challenge) => {
 return () => FaceAuth.setCaptureProvider(null); // cleanup on unmount
 ```
 
-The `challenge` argument is undefined on `register()` and one of `'headLeft' | 'headRight' | 'smile'` on `verify()` — your screen displays the prompt only when present.
+The `challenge` argument is undefined on `register()` and one of `'headLeft' | 'headRight' | 'smile' | 'blink'` on `verify()` — your screen displays the prompt only when present. The first three are **binding** (the fusion verdict gates on them); `'blink'` is a **bonus** prompt with a noisy single-shot proxy that never gates the verdict (D12).
 
 ## 3. Register (multi-shot enrollment)
 
@@ -89,6 +89,27 @@ await FaceAuth.syncNow();             // drains to your cloud endpoint
 
 await FaceAuth.purgeLocal();          // wipes ALL embeddings + queue + transmit log
 ```
+
+### Swapping the mock for a real AWS endpoint
+
+The brief asks for **"scope for sync with AWS server after network connectivity is restored"** (Deliverable 1b). The scope is shipped as a typed queue + a `syncNow()` drain method; the endpoint is mocked **by design** so the prototype runs fully offline. To wire the real AWS POST:
+
+1. Open `src/sync/syncQueue.ts`.
+2. Find the `mockCloudUpload(record)` call site inside `syncNow()`.
+3. Replace it with a SigV4-signed `fetch` (or an `@aws-sdk/client-*` call) to your endpoint. Example shape:
+
+```ts
+async function uploadRecord(record: VerificationRecord): Promise<void> {
+  const res = await fetch(`${process.env.EXPO_PUBLIC_FACEAUTH_SYNC_ENDPOINT}/records`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', /* SigV4 / Bearer here */ },
+    body: JSON.stringify(record), // already PII-minimal: id, personId, ts, matched, confidence, livenessPassed
+  });
+  if (!res.ok) throw new Error(`sync failed: ${res.status}`);
+}
+```
+
+Nothing else in the pipeline changes. The `VerificationRecord` shape is already audit-ready and never contains raw images — only the embedding-derived outcome.
 
 ## 6. Files you'll touch
 

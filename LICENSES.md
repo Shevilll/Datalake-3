@@ -48,7 +48,7 @@
 |---|---|---|---|---|---|
 | `yunet.onnx` | Face detect + 5 landmarks | OpenCV Zoo `face_detection_yunet_2023mar` | 0.23 MB | MIT | ✅ **confirmed + bundled** |
 | `minifasnet_v2.onnx` | Passive liveness (anti-spoof) | `garciafido/minifasnet-v2-anti-spoofing-onnx` (HF) → export of `minivision-ai/Silent-Face-Anti-Spoofing` | 1.74 MB | **Apache-2.0** (LICENSE file shipped: `models/minifasnet_v2.LICENSE`) | ✅ **confirmed + bundled** |
-| `recognition.onnx` | 512-d embedding | **our export** of `caojingtian1216/MobileFaceNet` backbone (head dropped) | 4.80 MB | **MIT** (weights repo); dataset = MS1M-derived (research terms) — disclosed in `models/README.md` | ✅ exported + bundled (gallery accuracy decides final lock, D8) |
+| `recognition.onnx` | 512-d embedding (**int8 LOCKED**) | **our export** of `caojingtian1216/MobileFaceNet` backbone (head dropped), dynamic int8 | **1.36 MB** | **MIT** (weights repo); dataset = MS1M-derived (research terms) — disclosed in `models/README.md` | ✅ **shipped int8 2026-05-28** (D4 lock; fp16 2.42 MB retained as fallback) |
 
 ### Recognition-model licensing — rejected candidates (C6 audit trail)
 | Candidate | Why rejected |

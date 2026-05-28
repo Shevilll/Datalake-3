@@ -6,15 +6,18 @@
 
 ## 1. Model footprint (C2 — target ~7–8 MB, ceiling ~20 MB)
 
+**Shipped:** int8 build, **3.33 MB total** (16.6% of the 20 MB ceiling).
+
 | Model | dtype | Size | Notes |
 |---|---|---|---|
 | YuNet (detect) | fp32 | **0.23 MB** | measured — MIT, OpenCV Zoo |
 | MiniFASNet-V2 (passive liveness) | fp32 | **1.74 MB** | measured — Apache-2.0 |
-| Recognition (embedding) | fp32 | 4.80 MB | our MIT MobileFaceNet export (D8) |
-| Recognition (embedding) | **int8** | **1.36 MB** | dynamic int8 — 28% of fp32, discriminativeness retained |
-| Recognition (embedding) | fp16 | 2.42 MB | accuracy-identical to fp32 (safe fallback, D4) |
-| **TOTAL (int8 build)** | — | **3.33 MB** | YuNet 0.23 + MiniFASNet 1.74 + recog-int8 1.36 — **vs ~7–8 MB target / 20 MB ceiling** |
-| **TOTAL (fp16 build)** | — | 4.39 MB | zero-accuracy-loss variant, still far under target |
+| Recognition (embedding) | **int8** | **1.36 MB** | **SHIPPED** — dynamic int8 (−72% vs fp32), discriminativeness retained |
+| Recognition (embedding) — fallback | fp16 | 2.42 MB | bit-identical accuracy vs fp32; held in `models/recognition.fp16.onnx` for one-file swap if gallery eval (Slice 5) ever flags int8 (D4) |
+| Recognition (embedding) — baseline | fp32 | 4.80 MB | our MIT MobileFaceNet export (D8), kept in `models/recognition.onnx` for reference |
+| **TOTAL (shipped int8 build)** | — | **3.33 MB** | YuNet 0.23 + MiniFASNet 1.74 + recog-int8 1.36 |
+| TOTAL (fp16 fallback build) | — | 4.39 MB | zero-accuracy-loss variant, still 22% of ceiling |
+| TOTAL (fp32 baseline) | — | 6.77 MB | reference only — never shipped |
 
 ## 2. End-to-end latency (C3 — `<1 s` on mid-range Android)
 
@@ -39,7 +42,7 @@ End-to-end = detect → passive liveness → embed → match (one verify pass; e
 | Same-id / diff-id cosine (sample) | 0.920 / −0.029 | 0.897 / 0.004 | 0.920 / −0.029 |
 | Accuracy on held-out gallery (C5) | _TBD_ | _TBD_ | _TBD_ |
 
-*int8 retains discriminativeness on sample faces (margin 0.89); fp16 is bit-identical to fp32. The int8-vs-fp16 lock is decided on the real gallery (Slice 5). Embedding latency comparison is measured on Android.*
+*int8 retains discriminativeness on sample faces (margin 0.89) — **locked as shipped dtype 2026-05-28**. fp16 is bit-identical to fp32 and retained as a one-file swap fallback if the Slice 5 gallery eval ever flags real-world drop. Embedding latency comparison is measured on Android.*
 
 ## 4. Accuracy & robustness (C5 — `>95%`, diverse Indian demographics + outdoor lighting)
 
