@@ -18,7 +18,9 @@
 | react-native-worklets-core | Frame-processor worklets | MIT | 🔎 |
 | ONNX Runtime Mobile (onnxruntime-react-native / native pods) | Single inference engine (all 3 models) | MIT | ✅ |
 | OpenCV (opencv2 framework / mobile build) | Frame→Mat, YuNet `FaceDetectorYN`, affine alignment warp | Apache-2.0 | ✅ |
-| react-native-mmkv (encrypted) | Encrypted embeddings-at-rest + queue | MIT | 🔎 |
+| react-native-mmkv (encrypted) | Encrypted embeddings-at-rest + queue | MIT | ✅ installed v4.3.x |
+| react-native-get-random-values | CSPRNG polyfill (Web Crypto getRandomValues) — anti-replay (D10) | MIT | ✅ installed v1.11.x |
+| expo-haptics | Tactile feedback on Register/Verify outcomes | MIT | ✅ installed v56.0.x |
 | expo-glass-effect | iOS 26 Liquid Glass (`GlassView`) | MIT | 🔎 |
 | @expo/ui (swift-ui) | SwiftUI glass morphing for signature moments | MIT | 🔎 |
 | @callstack/liquid-glass | Glass fallback (Fabric/TurboModule) | MIT | 🔎 |

@@ -39,7 +39,7 @@
 - **Decision:**
   1. `secureRandomInt()` uses **Web Crypto `getRandomValues`** when present, Math.random only as fallback. Web Crypto isn't in Hermes by default; the **`react-native-get-random-values` polyfill** (native) will be added and **batched into the next dev-client rebuild together with MMKV (Slice 3 storage)** — both need a native build, so we don't trigger a ~15-min device rebuild twice. Until then the code path is correct and degrades gracefully.
   2. Added `randomChallengeSequence(n)` — requiring a short sequence (n=2 → ~3.17 bits, blind-guess ≈ 11%) raises the replay bar and is a stronger pitch claim.
-- **Status:** code done; CSPRNG activates on-device after the batched native rebuild. The active challenge is not yet wired into the verify UX (pending on-device threshold tuning).
+- **Status:** code done; **CSPRNG polyfill installed and active on-device** (`react-native-get-random-values` shipped in the 2026-05-28 dev-client rebuild that also delivered encrypted MMKV gallery and expo-haptics).
 
 ## D9 — 2026-05-27 — Native pipeline architecture: VC5 + fast-opencv + ORT-RN (no custom native for v1); detection via ORT-decoded YuNet — set by Spike B findings
 
