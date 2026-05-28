@@ -22,7 +22,9 @@ End-to-end = detect → passive liveness → embed → match (one verify pass; e
 | Device | Class | EP | Detect | Liveness | Embed | Match | **E2E** | Rubric-valid? |
 |---|---|---|---|---|---|---|---|---|
 | ~3 GB Android (target) | mid-range | NNAPI/XNNPACK | _TBD_ | _TBD_ | _TBD_ | _TBD_ | **_TBD_** | ✅ **this is the C3 number** |
-| iPhone 17 Pro Max | flagship | CPU (default) | 13 ms | 2 ms | 3 ms | ~0 | _TBD (E2E)_ | ❌ functional check only |
+| iPhone 17 Pro Max | flagship | CPU (default) | 13 ms | 2 ms | 3 ms | ~0 | **~128 ms** | ❌ functional check only |
+
+**Slice 1 live verify (iPhone, 2026-05-28):** full register→verify on-device measured **~126–137 ms** end-to-end (JPEG decode + orientation-correct + detect + align + embed + match; single-shot, unoptimized — full-res 3088×2316 capture, no int8, default CPU EP). Detection 0.91–0.95. Same-person cosine ranged **0.44–0.84** across pose/expression on a single enrollment; one hard-angle shot dipped to **0.32** (false reject at τ=0.4) → multi-shot enrollment (match-against-max, already implemented) raises the floor; final τ_match tuned on the gallery (Slice 5). Different-context shots sat near **0.0–0.32** (correctly rejected). Purge verified live.
 
 **On-device proof (iPhone 17 Pro Max, 2026-05-28):** all 3 models load from the bundle in **222 ms** (cold) and raw inference is **13 ms (YuNet) / 2 ms (MiniFASNet) / 3 ms (MobileFaceNet)** via onnxruntime-react-native on the **default CPU EP** (no CoreML yet). Output shapes verified on-device: `[1,6400,1]` etc. / `[1,3]` / `[1,512]`. These are raw model-inference times on dummy inputs — full E2E adds camera capture + OpenCV preprocessing + decode + alignment + matching, and the rubric C3 number must come from weak Android (§0a). CoreML/NNAPI EPs are expected to reduce these further.
 
