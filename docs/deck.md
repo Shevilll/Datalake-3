@@ -192,7 +192,7 @@ await FaceAuth.purgeLocal(); // wipes embeddings + queue + transmit log
 
 **Security story:**
 - Biometric data **never leaves the device unencrypted**.
-- Encrypted-at-rest (MMKV with encryption) — batched into the next native build alongside CSPRNG polyfill and haptics, so we don't rebuild three times.
+- **Encrypted-at-rest (MMKV, AES-128) — shipped.** Embeddings + queue persisted in an encrypted store; production would derive the key from iOS Keychain / Android Keystore (constant key in demo, noted in source).
 - `purgeLocal()` is one method call away — auditable, demoable.
 
 **Visual:** a sequence diagram or screenshot of the log box showing the mocked POST payload + the purge confirmation.
@@ -219,10 +219,10 @@ await FaceAuth.purgeLocal(); // wipes embeddings + queue + transmit log
 **On the iPhone (airplane-mode capable):**
 
 1. **Register Ahmad** — capture 4–5 shots with slight pose variation (frontal, slight left, slight right, smile). Top pill shows "1 enrolled".
-2. **Verify** — tap → randomized challenge prompt appears in the Liquid Glass banner ("Turn slightly LEFT" or "Smile"). Perform → Capture → result panel: `✅ Ahmad — verified (cos 0.8x, ~130 ms)`.
+2. **Verify** — tap → randomized challenge prompt appears in the Liquid Glass banner ("Turn slightly LEFT" or "Smile"). Perform → Capture → result panel: `✅ Ahmad — verified (cos 0.8x, ~130 ms)` + a **Success** haptic.
 3. **Defeat #1 — printed/screen photo:** point camera at a phone showing Ahmad's photo → cosine matches BUT no commanded gesture → `❌ Challenge failed`.
 4. **Defeat #2 — wrong direction:** turn the wrong way for the prompted challenge → `❌ Challenge failed` even though face matches. Randomization defeats pre-recorded replays.
-5. **Sync & Purge:** `syncNow()` shows mock POST payload (no raw images) → `purgeLocal()` wipes; subsequent verify returns no match.
+5. **Sync & Purge** (live from the bottom panel): tap **Sync queue** → mock POST payload prints in Metro (no raw images, just `id / personId / timestamp / matched / confidence / livenessPassed`). Tap **Purge all** → wipes the encrypted gallery + sync queue + transmit log in one call; subsequent verify returns no match.
 
 **Visual:** rehearsed; ~90 seconds. Have a printed photo of yourself or a second phone ready for defeat #1.
 
@@ -243,7 +243,7 @@ await FaceAuth.purgeLocal(); // wipes embeddings + queue + transmit log
 
 **Roadmap (production):**
 
-- **Encrypted MMKV-backed gallery** (one-line swap behind the gallery interface) + haptics + CSPRNG polyfill — all in the same upcoming native rebuild.
+- ~~Encrypted MMKV-backed gallery + haptics + CSPRNG polyfill~~ — **shipped** in build `931044c`.
 - **Android rubric validation** on a real ~3 GB device + EP swap (NNAPI / XNNPACK).
 - **Pose-robust recognition** (e.g., a swap to a larger MobileFaceNet variant) → expand the active-challenge set back to all three with confidence.
 - **Two-model passive fusion** per Silent-Face's original design to make passive a true binding signal.
