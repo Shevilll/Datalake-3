@@ -97,9 +97,9 @@ const ALL_WITH_BONUS: readonly ActiveChallenge[] = [...BINDING, 'blink'];
 /**
  * Cryptographically-secure random int in [0, max). Challenge selection is security-relevant:
  * a predictable RNG would let an attacker pre-position a recorded gesture before the prompt,
- * defeating the anti-replay guarantee. Uses Web Crypto when present (activated on-device once
- * react-native-get-random-values is added in the next native build, see DECISIONS.md D10);
- * falls back to Math.random only if no CSPRNG is available.
+ * defeating the anti-replay guarantee. Uses Web Crypto `getRandomValues`, which is polyfilled
+ * at app start by `react-native-get-random-values` (imported in src/app/_layout.tsx; see
+ * DECISIONS.md D10). Falls back to Math.random only if no CSPRNG is available.
  */
 function secureRandomInt(max: number): number {
   const g = globalThis as { crypto?: { getRandomValues?: (a: Uint32Array) => Uint32Array } };

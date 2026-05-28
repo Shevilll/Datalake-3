@@ -66,7 +66,7 @@ Open the **Datalake FaceAuth** app on the device. Models load offline from the b
 
 ## Architecture, in one paragraph
 
-A captured photo (Vision Camera 5, JPEG) is decoded to a BGR Mat by `react-native-fast-opencv`, fed through **YuNet** (640×640 detect, decoded in TypeScript), **ArcFace-aligned** to 112×112 via a 5-point similarity transform, **embedded** by a MIT-licensed **MobileFaceNet** (int8, ~1.36 MB) to a 512-d L2-normalized vector, and matched by cosine against a local multi-shot gallery. A randomized **active challenge** (head turn or smile) verifies a real person performed a commanded gesture; **MiniFASNet** passive runs in parallel (informational). Everything is on the JS thread via `onnxruntime-react-native` — *no custom Swift/Kotlin native code in v1* (`DECISIONS.md` D9). Storage and sync queue are in-memory for the demo, behind a stable contract that swaps to encrypted MMKV with a single native-rebuild line change.
+A captured photo (Vision Camera 5, JPEG) is decoded to a BGR Mat by `react-native-fast-opencv`, fed through **YuNet** (640×640 detect, decoded in TypeScript), **ArcFace-aligned** to 112×112 via a 5-point similarity transform, **embedded** by a MIT-licensed **MobileFaceNet** (int8, ~1.36 MB) to a 512-d L2-normalized vector, and matched by cosine against a local multi-shot gallery. A randomized **active challenge** (head turn or smile) verifies a real person performed a commanded gesture; **MiniFASNet** passive runs in parallel (informational). Everything is on the JS thread via `onnxruntime-react-native` — *no custom Swift/Kotlin native code in v1* (`DECISIONS.md` D9). Enrolled embeddings are persisted in **AES-encrypted MMKV** (encrypted-at-rest, C8 — never raw images); the sync queue holds only audit records (outcome + cosine, no biometrics) and stays in-memory for the demo.
 
 ## Engineering decisions worth reading
 
@@ -74,7 +74,7 @@ The pivots that made the project work — `DECISIONS.md` is the audit trail:
 
 - **D8** — recognition model: MIT-licensed MobileFaceNet, exported from `caojingtian1216` (validated discriminative on sample faces).
 - **D9** — v1 uses no custom native code; Vision Camera 5 + fast-opencv + ORT-RN run the whole pipeline.
-- **D10** — challenge selection uses a CSPRNG (anti-replay); polyfill batched into the next native build.
+- **D10** — challenge selection uses a CSPRNG (anti-replay); `react-native-get-random-values` polyfill is installed and active (imported at app entry).
 - **D11** — **active gesture is the binding liveness signal** (CSPRNG-randomized; defeats both photo and replay). Passive MiniFASNet was measured on real iPhone selfies AND 2D photos from the same pipeline and saturates on both — it doesn't discriminate on this device's camera distribution. We surface its score in `VerifyResult.passiveScore` as a **transparency / extensibility hook** so production can drop in a stronger fused passive model without touching the FaceAuth contract; we do NOT hard-gate on it.
 - **D4** — int8 quantization is the headline compression (4.80 → 1.36 MB); fp16 is the zero-loss fallback.
 

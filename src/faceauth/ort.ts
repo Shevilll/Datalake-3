@@ -9,12 +9,15 @@
 import { Asset } from 'expo-asset';
 import * as ort from 'onnxruntime-react-native';
 
-// Metro bundles these as binary assets (see metro.config.js assetExts += onnx).
+// Metro bundles these as binary assets (see metro.config.js assetExts += onnx). `require()` is
+// the only way to get a Metro asset module id for a non-JS file — ESM import won't resolve .onnx.
+/* eslint-disable @typescript-eslint/no-require-imports */
 const MODEL_MODULES = {
   yunet: require('../../assets/models/yunet.onnx'),
   liveness: require('../../assets/models/minifasnet_v2.onnx'),
   recognition: require('../../assets/models/recognition.onnx'),
 } as const;
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 export interface Sessions {
   readonly yunet: ort.InferenceSession;
@@ -65,7 +68,6 @@ export async function runSelfTest(): Promise<string[]> {
   const log: string[] = [];
   const push = (s: string): void => {
     log.push(s);
-    // eslint-disable-next-line no-console
     console.log('[FaceAuth selftest]', s);
   };
 

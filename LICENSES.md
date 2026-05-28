@@ -10,24 +10,32 @@
 
 ## Runtime libraries (the shipped app)
 
-| Dependency | Purpose | License | Status |
-|---|---|---|---|
-| Expo SDK (latest) + expo-dev-client | App framework, dev build, CNG | MIT | 🔎 confirm at install |
-| React Native | Cross-platform runtime (New Arch) | MIT | ✅ |
-| react-native-vision-camera (v4+) | Camera + frame processors | MIT | ✅ |
-| react-native-worklets-core | Frame-processor worklets | MIT | 🔎 |
-| ONNX Runtime Mobile (onnxruntime-react-native / native pods) | Single inference engine (all 3 models) | MIT | ✅ |
-| OpenCV (opencv2 framework / mobile build) | Frame→Mat, YuNet `FaceDetectorYN`, affine alignment warp | Apache-2.0 | ✅ |
-| react-native-mmkv (encrypted) | Encrypted embeddings-at-rest + queue | MIT | ✅ installed v4.3.x |
-| react-native-get-random-values | CSPRNG polyfill (Web Crypto getRandomValues) — anti-replay (D10) | MIT | ✅ installed v1.11.x |
-| expo-haptics | Tactile feedback on Register/Verify outcomes | MIT | ✅ installed v56.0.x |
-| expo-glass-effect | iOS 26 Liquid Glass (`GlassView`) | MIT | 🔎 |
-| @expo/ui (swift-ui) | SwiftUI glass morphing for signature moments | MIT | 🔎 |
-| @callstack/liquid-glass | Glass fallback (Fabric/TurboModule) | MIT | 🔎 |
-| react-native-reanimated (v3) | Animation / motion | MIT | 🔎 |
-| expo-haptics | Success/match haptics | MIT | 🔎 |
-| zustand | Light global state | MIT | 🔎 |
-| (FSM) xstate *or* typed reducer | Camera/liveness state machine | MIT | 🔎 |
+> Every row below is **installed and shipped**; license + version confirmed from `node_modules/<pkg>/package.json`. All permissive (MIT, except OpenCV = Apache-2.0).
+
+| Dependency | Version | Purpose | License | Status |
+|---|---|---|---|---|
+| expo (SDK 56) + expo-dev-client + expo-router / -image / -font / -haptics / -glass-effect / -symbols / -constants / -device / -linking / -splash-screen / -status-bar / -system-ui / -web-browser | 56.x | App framework, dev build, CNG, routing, splash, haptics, glass | MIT | ✅ |
+| react-native | 0.85.3 | Cross-platform runtime (New Arch enabled) | MIT | ✅ |
+| react / react-dom | 19.2.3 | UI runtime | MIT | ✅ |
+| react-native-vision-camera | 5.0.11 | Camera + photo capture (Nitro) | MIT | ✅ |
+| react-native-worklets | 0.8.3 | Worklets runtime (VC5 dependency; supersedes worklets-core) | MIT | ✅ |
+| react-native-nitro-modules | 0.35.9 | Nitro native-module runtime (VC5 + mmkv + fast-opencv) | MIT | ✅ |
+| react-native-nitro-image | 0.15.0 | Nitro image interop | MIT | ✅ |
+| onnxruntime-react-native | 1.24.3 | Single inference engine (all 3 models) | MIT | ✅ |
+| react-native-fast-opencv | 0.4.8 | Frame→Mat, color convert, affine warp/align (JSI/Nitro OpenCV) | MIT | ✅ |
+| OpenCV (bundled by react-native-fast-opencv) | 4.x | Underlying CV kernels | Apache-2.0 | ✅ |
+| react-native-mmkv | 4.3.1 | **AES-encrypted** embeddings-at-rest (gallery) | MIT | ✅ |
+| react-native-get-random-values | 1.11.0 | CSPRNG polyfill (Web Crypto getRandomValues) — anti-replay (D10) | MIT | ✅ |
+| expo-glass-effect | 56.0.4 | iOS 26 Liquid Glass (`GlassView`) | MIT | ✅ |
+| @expo/ui | 56.0.14 | SwiftUI primitives for signature glass moments | MIT | ✅ |
+| expo-haptics | 56.0.3 | Tactile feedback on Register/Verify/Purge | MIT | ✅ |
+| react-native-reanimated | 4.3.1 | Animation / motion | MIT | ✅ |
+| react-native-gesture-handler | 2.31.2 | Gesture primitives (router/screens dep) | MIT | ✅ |
+| react-native-screens | 4.25.2 | Native screen containers (expo-router) | MIT | ✅ |
+| react-native-safe-area-context | 5.7.0 | Safe-area insets | MIT | ✅ |
+| react-native-web | 0.21.x | Web target (not in the native binary) | MIT | ✅ |
+
+> **Evaluated but NOT shipped** (so not a dependency, no license obligation): `@callstack/liquid-glass` (expo-glass-effect covered the glass needs), `zustand` / `xstate` (camera/liveness state is a small typed React-state machine — no state lib pulled in, per §3b "keep it light"), `react-native-worklets-core` (superseded by `react-native-worklets`).
 
 ## Dev / tooling (not shipped in the app binary)
 
@@ -64,4 +72,4 @@ Export MobileFaceNet → ONNX from an **MIT/Apache PyTorch source** so we own a 
 
 ---
 
-*Last updated: 2026-05-27 — initial inventory at project start, before first dependency install.*
+*Last updated: 2026-05-28 — runtime table reconciled against the actually-installed dependency set (versions + licenses confirmed from `node_modules`); evaluated-but-unshipped libs moved out of the dependency list. All shipped deps permissive (MIT; OpenCV Apache-2.0) — C6 satisfied.*

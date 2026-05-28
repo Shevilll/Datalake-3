@@ -9,12 +9,12 @@
 export const DETECTION = {
   scoreThreshold: 0.85,
   nmsThreshold: 0.3,
-  /** longest side the frame is downscaled to before YuNet, for speed. */
-  inputSize: 320,
   /** min face-box height (px, in source frame) to accept. */
   minBoxPx: 80,
   topK: 50,
 } as const;
+// NOTE: YuNet's ONNX input is a FIXED 640x640 (ORT enforces it) — see YUNET_INPUT_SIZE in
+// yunet.ts. The frame is always stretched to 640x640, so there is no configurable detect size.
 
 /** Passive liveness — MiniFASNet-V2 (§4.2). BGR, 2.7x crop, 80x80, /255, NCHW. */
 export const LIVENESS = {

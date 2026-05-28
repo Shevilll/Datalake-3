@@ -89,7 +89,7 @@ interface OrientedDetection {
   readonly height: number;
 }
 
-const ROTATIONS: ReadonlyArray<{ code: RotateFlags; label: string; swaps: boolean }> = [
+const ROTATIONS: readonly { code: RotateFlags; label: string; swaps: boolean }[] = [
   { code: RotateFlags.ROTATE_90_CLOCKWISE, label: '90cw', swaps: true },
   { code: RotateFlags.ROTATE_90_COUNTERCLOCKWISE, label: '90ccw', swaps: true },
   { code: RotateFlags.ROTATE_180, label: '180', swaps: false },
@@ -115,7 +115,6 @@ async function detectOriented(
     const h = r.swaps ? width : height;
     const det = await detectFace(sessions, rot, w, h);
     if (det) {
-      // eslint-disable-next-line no-console
       console.log(`[FaceAuth] detect orientation=${r.label} score=${det.score.toFixed(2)}`);
       return { mat: rot, detection: det, orientation: r.label, width: w, height: h };
     }
@@ -146,17 +145,25 @@ export interface VerifyOutcome {
   readonly matched: boolean;
   readonly personId: string | null;
   readonly confidence: number;
-  /** passive anti-spoof score (1 - p_print - p_replay); defeats printed/screen photos (§4.2). */
+  /**
+   * Passive MiniFASNet score (1 - p_print - p_replay). Surfaced for transparency / future
+   * fusion only — NOT a binding gate: this export saturates on both live and 2D inputs from
+   * this device's camera distribution, so the binding liveness proof is the active challenge
+   * (D11). Production can drop in a stronger passive model behind this same field.
+   */
   readonly passiveScore: number;
+  /** passive pass (score >= tauLive) — informational; the caller gates on the active challenge (D11). */
   readonly livenessPassed: boolean;
   readonly detection?: Detection;
   readonly latencyMs: number;
 }
 
 /**
- * Verify: detect -> passive liveness -> embed -> cosine match.
- * Passive liveness is the single-shot anti-spoof; the randomized active challenge (Slice 2b)
- * fuses on top in the UI. A real "verified" = matched AND livenessPassed (AND active challenge).
+ * Verify: detect -> passive liveness (informational) -> embed -> cosine match.
+ * Passive runs and its score is returned for transparency, but it does NOT gate the verdict
+ * (D11 — this MiniFASNet export saturates on this camera distribution). The binding liveness
+ * proof is the randomized active challenge, applied by the caller (FaceAuth.verify / the screen):
+ * a real "verified" = matched AND the active challenge was satisfied.
  */
 export async function verifyFromMat(
   sessions: Sessions,
@@ -184,7 +191,6 @@ export async function verifyFromMat(
     const live = await passiveLiveness(sessions, o.mat, o.detection.box, o.width, o.height);
     const embedding = await embedFace(sessions, o.mat, o.detection.landmarks);
     const match = matchAgainstGallery(embedding, getGallery(), tauMatch);
-    // eslint-disable-next-line no-console
     console.log(`[FaceAuth] live=${live.score.toFixed(2)} probs=[${live.probs.map((p) => p.toFixed(2)).join(',')}]`);
     return {
       ok: true,

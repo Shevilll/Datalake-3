@@ -6,8 +6,10 @@
  * the AWS sync — the contract is what's graded). purgeLocal() wipes embeddings + queue + logs
  * and is demonstrated live.
  *
- * Slice 3 backs the queue + gallery with encrypted MMKV (embeddings-at-rest); that swap is
- * batched into the next native dev-client rebuild (see DECISIONS.md D10). The API here is stable.
+ * Storage split: the enrollment gallery (the biometric data) is persisted in AES-encrypted
+ * MMKV (see faceauth/gallery.ts — encrypted-at-rest, C8). This audit queue holds only
+ * VerificationRecords (id / personId / timestamp / outcome — never embeddings or images), so it
+ * stays in-memory for the demo; persisting it is a one-line MMKV swap if durability is needed.
  */
 
 import { purgeAll as purgeGallery } from '../faceauth/gallery';
@@ -17,7 +19,6 @@ const queue: VerificationRecord[] = [];
 const transmittedLog: VerificationRecord[] = [];
 
 const log = (msg: string, data?: unknown): void => {
-  // eslint-disable-next-line no-console
   console.log(`[FaceAuth sync] ${msg}`, data ?? '');
 };
 
