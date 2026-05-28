@@ -10,10 +10,11 @@
 |---|---|---|---|
 | YuNet (detect) | fp32 | **0.23 MB** | measured — MIT, OpenCV Zoo |
 | MiniFASNet-V2 (passive liveness) | fp32 | **1.74 MB** | measured — Apache-2.0 |
-| Recognition (embedding) | fp32 | **4.80 MB** | measured — our MIT MobileFaceNet export (D8) |
-| Recognition (embedding) | **int8** | _TBD_ | headline compression (next) |
-| Recognition (embedding) | fp16 | _TBD_ | accuracy-safe fallback (DECISIONS.md D4) |
-| **TOTAL (shipped set, fp32)** | — | **6.77 MB** | **under the ~7–8 MB target, all 3 models** — vs 20 MB ceiling; int8 on recognition will cut further |
+| Recognition (embedding) | fp32 | 4.80 MB | our MIT MobileFaceNet export (D8) |
+| Recognition (embedding) | **int8** | **1.36 MB** | dynamic int8 — 28% of fp32, discriminativeness retained |
+| Recognition (embedding) | fp16 | 2.42 MB | accuracy-identical to fp32 (safe fallback, D4) |
+| **TOTAL (int8 build)** | — | **3.33 MB** | YuNet 0.23 + MiniFASNet 1.74 + recog-int8 1.36 — **vs ~7–8 MB target / 20 MB ceiling** |
+| **TOTAL (fp16 build)** | — | 4.39 MB | zero-accuracy-loss variant, still far under target |
 
 ## 2. End-to-end latency (C3 — `<1 s` on mid-range Android)
 
@@ -30,11 +31,15 @@ End-to-end = detect → passive liveness → embed → match (one verify pass; e
 
 ## 3. Quantization impact (Innovation — int8 story)
 
-| Metric | fp32 | int8 | Δ |
+| Metric | fp32 | int8 | fp16 |
 |---|---|---|---|
-| Recognition model size | _TBD_ | _TBD_ | |
-| Embed latency (Android) | _TBD_ | _TBD_ | |
-| Accuracy on held-out gallery | _TBD_ | _TBD_ | must stay > 95% (C5) |
+| Recognition model size | 4.80 MB | **1.36 MB** (−72%) | 2.42 MB (−50%) |
+| Embed latency (Android) | _TBD_ | _TBD_ | _TBD_ |
+| Sample-face separation margin | 0.948 | 0.892 | 0.948 |
+| Same-id / diff-id cosine (sample) | 0.920 / −0.029 | 0.897 / 0.004 | 0.920 / −0.029 |
+| Accuracy on held-out gallery (C5) | _TBD_ | _TBD_ | _TBD_ |
+
+*int8 retains discriminativeness on sample faces (margin 0.89); fp16 is bit-identical to fp32. The int8-vs-fp16 lock is decided on the real gallery (Slice 5). Embedding latency comparison is measured on Android.*
 
 ## 4. Accuracy & robustness (C5 — `>95%`, diverse Indian demographics + outdoor lighting)
 

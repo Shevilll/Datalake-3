@@ -6,6 +6,41 @@
 
 ---
 
+## D11 — 2026-05-28 — Slice 2 fusion lock: active is the binding liveness signal; passive is informational defense-in-depth
+
+- **Trigger:** on-device passive testing showed MiniFASNet-V2 saturates to class 2 (replay)
+  with p≈0.99 for **both** 2D photos and live iPhone-front-camera selfies — i.e. it doesn't
+  discriminate live vs spoof on this device class. Recipe matches the model card; the issue
+  is model bias / training-data mismatch, not preprocessing.
+- **Pivot (planned in D8 as the fallback):** drop the **hard** passive gate; make the
+  randomized **active challenge** (`headLeft`/`headRight`/`smile`) the binding liveness proof.
+  Passive still runs and is logged (informational), but `verified = matched AND satisfiesChallenge`.
+- **Calibrated parameters (on-device, 2026-05-28):**
+  - `yawSign = -1` (front-camera mirror — turning LEFT yields **+yaw** on this build).
+  - `yawTurn = 0.15` (moderate turn satisfies, extreme turns avoided to keep recognition cos high).
+  - `smileSpread = 0.75` (YuNet mouth corners run lower than textbook anthropometry; observed
+    smile range 0.76–0.91, neutral 0.64–0.79 — threshold splits these adequately).
+  - Prompts soften to "Turn slightly LEFT/RIGHT" so users don't overshoot and break recognition.
+- **Unlock — multi-shot enrollment is load-bearing.** With **single-frontal** enrollment, even
+  modest turn (yaw≈0.3) drops recognition cosine to ~0.14 on this 1.2 M-param MIT MobileFaceNet.
+  With enrollment covering **frontal + slight-turn + smiling** samples (3–5 shots), all three
+  active challenges verify reliably: cos 0.79–0.86, latency ~128–141 ms, directional intent
+  correctly enforced (`sat=true` only when the user turns in the prompted direction).
+- **Honest pitch framing:** "Active gesture is the binding liveness; passive is documented
+  defense-in-depth and demonstrably rejects nothing on this single MiniFASNet-V2 export — in
+  production we'd swap or fuse two passive models per the upstream Silent-Face design."
+- **Status:** Slice 2 functionally complete. Slice 5 gallery accuracy + Android validation
+  finalize the τ_match and any threshold drift.
+
+## D10 — 2026-05-28 — Active-challenge randomization uses a CSPRNG (anti-replay), polyfill batched into next native build
+
+- **Trigger:** automated security review flagged `Math.random()` in `randomChallenge()` (HIGH, weak crypto primitive).
+- **Why it's valid (not just hygiene):** the randomized active challenge IS the anti-replay mechanism (§5.2). A predictable RNG lets an attacker pre-position a recorded gesture before the prompt → replay defeats liveness. CSPRNG → unpredictable → the attacker must react in real time, which a pre-recorded video can't. The reviewer's entropy point is also valid: 3 challenges ≈ 1.58 bits.
+- **Decision:**
+  1. `secureRandomInt()` uses **Web Crypto `getRandomValues`** when present, Math.random only as fallback. Web Crypto isn't in Hermes by default; the **`react-native-get-random-values` polyfill** (native) will be added and **batched into the next dev-client rebuild together with MMKV (Slice 3 storage)** — both need a native build, so we don't trigger a ~15-min device rebuild twice. Until then the code path is correct and degrades gracefully.
+  2. Added `randomChallengeSequence(n)` — requiring a short sequence (n=2 → ~3.17 bits, blind-guess ≈ 11%) raises the replay bar and is a stronger pitch claim.
+- **Status:** code done; CSPRNG activates on-device after the batched native rebuild. The active challenge is not yet wired into the verify UX (pending on-device threshold tuning).
+
 ## D9 — 2026-05-27 — Native pipeline architecture: VC5 + fast-opencv + ORT-RN (no custom native for v1); detection via ORT-decoded YuNet — set by Spike B findings
 
 - **Spike B findings (confirmed this session):**
@@ -69,7 +104,8 @@
 - **Decision:** Keep int8 as the *goal* and the pitch's compression story, **but** make the final dtype an **empirical** call: quantize to int8, measure accuracy on a held-out gallery, and ship int8 only if the accuracy drop is negligible; otherwise ship **fp16**.
 - **Why:** Footprint is **not** the binding constraint here. A MobileFaceNet backbone is ~4 MB fp32 / ~2 MB fp16 / ~1 MB int8 — **all three pass the 20 MB ceiling (C2) with large headroom.** The binding constraint is **accuracy > 95% (C5)**, and ArcFace-style embeddings can degrade more than expected under naïve int8 (especially per-tensor S8S8). So we optimize for the binding constraint and let measured accuracy pick the dtype. Either way we report both size + accuracy numbers on a slide, which is itself the Innovation narrative.
 - **Mitigations if int8 is kept:** per-channel weight quantization, calibration on representative Indian-demographic/outdoor images, validate L2-normed cosine separation before/after.
-- **Status:** OPEN — resolved by the held-out eval in slice 5. Record before/after numbers in `docs/benchmarks.md`.
+- **Update 2026-05-28 — measured (`harness/quantize_recognition.py`):** dynamic **int8 = 1.36 MB (−72%)**, **fp16 = 2.42 MB (−50%, bit-identical accuracy)**. On sample faces int8 keeps the separation margin (0.892 vs fp32 0.948; same-id 0.897 / diff-id 0.004) — fully discriminative, self-consistent (enroll+verify both int8). fp16 is a zero-loss safe fallback. Totals: **int8 build 3.33 MB**, fp16 build 4.39 MB (all 3 models). Bundled app still ships fp32 until the gallery eval picks the lock.
+- **Status:** int8 + fp16 produced & validated on samples; **final int8-vs-fp16 lock deferred to the Slice 5 gallery eval** (C5 >95%). int8 is the provisional headline (3.33 MB); fp16 is the locked-safe fallback. Numbers in `docs/benchmarks.md`.
 
 ## D3 — 2026-05-27 — Active-liveness challenge set: head-turn + smile + mouth-open; blink deferred — **DEVIATION from §5.1**
 
@@ -82,6 +118,7 @@
 - **Choice:** **(a)** as the shipped default. Blink becomes a **stretch goal** only if (b) is later justified.
 - **Why:** The brief's deliverable 1a requires the user to "**blink, smile, or turn their head slightly**" — **smile + head-turn fully satisfies it**. Option (a) keeps us **ORT-only, footprint-tiny, and dependency-light**, and randomizing among 3–4 challenges still defeats pre-recorded replay (the actual security goal). Paying a 2–3 MB model purely to enable blink would erode the footprint headline (C2/Innovation) for no rubric gain.
 - **Security note:** The fusion rule (passive MiniFASNet AND a randomized active challenge within a time window) is unchanged; the differentiator survives intact.
+- **Update 2026-05-28 (implementation):** dropped **mouthOpen** too — the 5 landmarks are 2 eye centers + nose + 2 mouth *corners*, with no lip-contour points, so vertical mouth opening isn't measurable. Shipped active set = **headLeft / headRight / smile** (`src/faceauth/activeLiveness.ts`: yaw = nose offset from eye-midpoint / interocular; smile = mouth-corner spread / interocular). Thresholds + front-camera yaw sign are tuned on-device. `ActiveChallenge` type updated in `types.ts`.
 
 ## D2 — 2026-05-27 — Frame-processor wiring: Nitro Modules by default, proxy fallback gated by the Day-0 spike
 

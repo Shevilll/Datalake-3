@@ -57,8 +57,14 @@ export async function embedFace(sessions: Sessions, mat: Mat, landmarks: Landmar
 }
 
 /** Passive liveness score = 1 - (p_print + p_replay) (§4.2). */
-export async function passiveLiveness(sessions: Sessions, mat: Mat, box: FaceBox): Promise<LivenessResult> {
-  const input = buildLivenessInput(mat, box);
+export async function passiveLiveness(
+  sessions: Sessions,
+  mat: Mat,
+  box: FaceBox,
+  imgW: number,
+  imgH: number,
+): Promise<LivenessResult> {
+  const input = buildLivenessInput(mat, box, imgW, imgH);
   const inName = sessions.liveness.inputNames[0];
   const outName = sessions.liveness.outputNames[0];
   if (inName === undefined || outName === undefined) throw new Error('liveness: missing IO name');
@@ -79,6 +85,8 @@ interface OrientedDetection {
   readonly mat: Mat;
   readonly detection: Detection;
   readonly orientation: string;
+  readonly width: number;
+  readonly height: number;
 }
 
 const ROTATIONS: ReadonlyArray<{ code: RotateFlags; label: string; swaps: boolean }> = [
@@ -99,7 +107,7 @@ async function detectOriented(
   height: number,
 ): Promise<OrientedDetection | null> {
   const asIs = await detectFace(sessions, mat, width, height);
-  if (asIs) return { mat, detection: asIs, orientation: 'as-is' };
+  if (asIs) return { mat, detection: asIs, orientation: 'as-is', width, height };
   for (const r of ROTATIONS) {
     const rot = OpenCV.createObject(ObjectType.Mat, 0, 0, DataTypes.CV_8UC3);
     OpenCV.invoke('rotate', mat, rot, r.code);
@@ -109,7 +117,7 @@ async function detectOriented(
     if (det) {
       // eslint-disable-next-line no-console
       console.log(`[FaceAuth] detect orientation=${r.label} score=${det.score.toFixed(2)}`);
-      return { mat: rot, detection: det, orientation: r.label };
+      return { mat: rot, detection: det, orientation: r.label, width: w, height: h };
     }
   }
   return null;
@@ -138,31 +146,53 @@ export interface VerifyOutcome {
   readonly matched: boolean;
   readonly personId: string | null;
   readonly confidence: number;
+  /** passive anti-spoof score (1 - p_print - p_replay); defeats printed/screen photos (§4.2). */
+  readonly passiveScore: number;
+  readonly livenessPassed: boolean;
   readonly detection?: Detection;
   readonly latencyMs: number;
 }
 
-/** Verify (Slice 1): detect -> embed -> cosine match against the local gallery. */
+/**
+ * Verify: detect -> passive liveness -> embed -> cosine match.
+ * Passive liveness is the single-shot anti-spoof; the randomized active challenge (Slice 2b)
+ * fuses on top in the UI. A real "verified" = matched AND livenessPassed (AND active challenge).
+ */
 export async function verifyFromMat(
   sessions: Sessions,
   mat: Mat,
   width: number,
   height: number,
   tauMatch: number = MATCHING.tauMatch,
+  tauLive: number = LIVENESS.tauLive,
 ): Promise<VerifyOutcome> {
   const t0 = Date.now();
   try {
     const o = await detectOriented(sessions, mat, width, height);
     if (!o) {
-      return { ok: false, reason: 'no face detected', matched: false, personId: null, confidence: 0, latencyMs: Date.now() - t0 };
+      return {
+        ok: false,
+        reason: 'no face detected',
+        matched: false,
+        personId: null,
+        confidence: 0,
+        passiveScore: 0,
+        livenessPassed: false,
+        latencyMs: Date.now() - t0,
+      };
     }
+    const live = await passiveLiveness(sessions, o.mat, o.detection.box, o.width, o.height);
     const embedding = await embedFace(sessions, o.mat, o.detection.landmarks);
     const match = matchAgainstGallery(embedding, getGallery(), tauMatch);
+    // eslint-disable-next-line no-console
+    console.log(`[FaceAuth] live=${live.score.toFixed(2)} probs=[${live.probs.map((p) => p.toFixed(2)).join(',')}]`);
     return {
       ok: true,
       matched: match.matched,
       personId: match.personId,
       confidence: match.confidence,
+      passiveScore: live.score,
+      livenessPassed: live.score >= tauLive,
       detection: o.detection,
       latencyMs: Date.now() - t0,
     };

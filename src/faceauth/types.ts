@@ -43,7 +43,7 @@ export interface LivenessResult {
   readonly probs: readonly [real: number, print: number, replay: number];
 }
 
-export type ActiveChallenge = 'headLeft' | 'headRight' | 'smile' | 'mouthOpen';
+export type ActiveChallenge = 'headLeft' | 'headRight' | 'smile';
 
 /** The result of a full verify pass — the headline object the demo + Datalake read (§8). */
 export interface VerifyResult {

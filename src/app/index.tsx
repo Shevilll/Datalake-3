@@ -10,6 +10,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, useCameraDevice, useCameraPermission, usePhotoOutput } from 'react-native-vision-camera';
 
+import {
+  type ActiveChallenge,
+  challengePrompt,
+  computeGeometry,
+  randomChallenge,
+  satisfiesChallenge,
+} from '@/faceauth/activeLiveness';
 import { photoToMat } from '@/faceauth/capture';
 import { addEnrollment, listEnrolled, purgeAll } from '@/faceauth/gallery';
 import { loadSessions, type Sessions } from '@/faceauth/ort';
@@ -31,6 +38,9 @@ export default function HomeScreen() {
   const [cameraReady, setCameraReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState('');
+  // active-challenge verify flow: idle -> awaiting (user performs the prompted gesture) -> processing
+  const [challenge, setChallenge] = useState<ActiveChallenge | null>(null);
+  const yawSignRef = useRef<1 | -1>(-1); // front-camera mirror: turning LEFT yields +yaw on this device, so flip
   const [enrolled, setEnrolled] = useState<string[]>([]);
   const [result, setResult] = useState<string>('');
   const [log, setLog] = useState<string[]>([]);
@@ -96,33 +106,57 @@ export default function HomeScreen() {
     }
   };
 
+  /**
+   * Two-step active-challenge verify.
+   *  1st tap (idle): pick a random challenge, display the prompt, wait for the user to perform.
+   *  2nd tap (awaiting): capture, run pipeline, check identity match + challenge geometry.
+   * Final verdict: matched AND active-challenge satisfied. Passive score is shown for info only
+   * (single-MiniFASNet is unreliable on modern selfies — DECISIONS.md D8 fallback).
+   */
   const handleVerify = async (): Promise<void> => {
     const sessions = sessionsRef.current;
     if (!sessions || busy) return;
+
+    if (challenge === null) {
+      const c = randomChallenge();
+      setChallenge(c);
+      setResult('');
+      push(`challenge: ${challengePrompt(c)}`);
+      return;
+    }
+
     setBusy(true);
-    setResult('');
     try {
       const shot = await capture();
       if (!shot) return;
       const { mat, width, height } = await photoToMat(shot.path);
       const out = await verifyFromMat(sessions, mat, width, height);
-      if (!out.ok) {
-        setResult(`No match: ${out.reason ?? ''}`);
-        push(`verify: ${out.reason ?? 'no face'} (${out.latencyMs}ms)`);
+      if (!out.ok || !out.detection) {
+        setResult(`❌ No face detected (${out.latencyMs}ms)`);
+        push(`verify: no face (${out.latencyMs}ms)`);
         return;
       }
-      const conf = out.confidence.toFixed(3);
-      setResult(
-        out.matched
-          ? `✅ ${out.personId}  (cos ${conf}, ${out.latencyMs}ms)`
-          : `❌ no match  (best cos ${conf}, ${out.latencyMs}ms)`,
-      );
-      push(`verify matched=${out.matched} id=${out.personId} cos=${conf} ${out.latencyMs}ms`);
+      const g = computeGeometry(out.detection.landmarks);
+      const satisfied = satisfiesChallenge(challenge, g, yawSignRef.current);
+      const verified = out.matched && satisfied;
+      const cos = out.confidence.toFixed(3);
+      const yaw = g.yaw.toFixed(2);
+      const smile = g.smile.toFixed(2);
+      const live = out.passiveScore.toFixed(2);
+      push(`verify matched=${out.matched} sat=${satisfied} verified=${verified} cos=${cos} yaw=${yaw} smile=${smile} live=${live} (${out.latencyMs}ms)`);
+      if (verified) {
+        setResult(`✅ ${out.personId} — verified (${challengePrompt(challenge)} ✓, cos ${cos}, ${out.latencyMs}ms)`);
+      } else if (out.matched && !satisfied) {
+        setResult(`❌ Challenge failed — ${challengePrompt(challenge)} (yaw ${yaw}, smile ${smile}, ${out.latencyMs}ms)`);
+      } else {
+        setResult(`❌ No match (best cos ${cos}, ${out.latencyMs}ms)`);
+      }
     } catch (e) {
       setResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
       push(`verify error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
+      setChallenge(null);
     }
   };
 
@@ -166,6 +200,14 @@ export default function HomeScreen() {
           </Text>
         </View>
 
+        {challenge !== null && (
+          <View style={styles.challengeBanner}>
+            <Text style={styles.challengeBannerLabel}>ACTIVE LIVENESS</Text>
+            <Text style={styles.challengeBannerPrompt}>{challengePrompt(challenge)}</Text>
+            <Text style={styles.challengeBannerHint}>…then tap Capture</Text>
+          </View>
+        )}
+
         <View style={styles.panel}>
           {result.length > 0 && <Text style={styles.result}>{result}</Text>}
 
@@ -199,7 +241,7 @@ export default function HomeScreen() {
               onPress={() => void handleVerify()}
               disabled={busy || status !== 'ready' || !cameraReady}
             >
-              <Text style={styles.btnText}>Verify</Text>
+              <Text style={styles.btnText}>{challenge !== null ? 'Capture' : 'Verify'}</Text>
             </Pressable>
           </View>
 
@@ -232,6 +274,19 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   topPillText: { color: '#FFFFFF', fontWeight: '600' },
+  challengeBanner: {
+    alignSelf: 'center',
+    marginTop: 12,
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+    borderRadius: 18,
+    backgroundColor: 'rgba(11,27,51,0.86)',
+    alignItems: 'center',
+    gap: 4,
+  },
+  challengeBannerLabel: { color: '#7DD3FC', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  challengeBannerPrompt: { color: '#FFFFFF', fontSize: 22, fontWeight: '800' },
+  challengeBannerHint: { color: '#94A3B8', fontSize: 12 },
   panel: {
     margin: 12,
     padding: 16,
