@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, useCameraDevice, useCameraPermission, usePhotoOutput } from 'react-native-vision-camera';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 
 import {
   type ActiveChallenge,
@@ -54,6 +55,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     void (async () => {
+      push(`liquid glass: ${isLiquidGlassAvailable() ? 'available (iOS 26+)' : 'fallback (plain View)'}`);
       if (!hasPermission) await requestPermission();
       try {
         sessionsRef.current = await loadSessions();
@@ -187,7 +189,7 @@ export default function HomeScreen() {
       )}
 
       <SafeAreaView style={styles.overlay} pointerEvents="box-none">
-        <View style={styles.topPill}>
+        <GlassView style={styles.topPill} glassEffectStyle="regular" colorScheme="light">
           <Text style={styles.topPillText}>
             {status === 'error'
               ? 'Load error'
@@ -198,17 +200,17 @@ export default function HomeScreen() {
                   : 'Starting camera…'}
             {enrolled.length > 0 ? `  ·  ${enrolled.length} enrolled` : ''}
           </Text>
-        </View>
+        </GlassView>
 
         {challenge !== null && (
-          <View style={styles.challengeBanner}>
+          <GlassView style={styles.challengeBanner} glassEffectStyle="regular" colorScheme="light">
             <Text style={styles.challengeBannerLabel}>ACTIVE LIVENESS</Text>
             <Text style={styles.challengeBannerPrompt}>{challengePrompt(challenge)}</Text>
             <Text style={styles.challengeBannerHint}>…then tap Capture</Text>
-          </View>
+          </GlassView>
         )}
 
-        <View style={styles.panel}>
+        <GlassView style={styles.panel} glassEffectStyle="regular" colorScheme="light">
           {result.length > 0 && <Text style={styles.result}>{result}</Text>}
 
           <View style={styles.logBox}>
@@ -248,7 +250,7 @@ export default function HomeScreen() {
           <Pressable style={styles.purge} onPress={handlePurge} disabled={busy}>
             <Text style={styles.purgeText}>Purge gallery</Text>
           </Pressable>
-        </View>
+        </GlassView>
       </SafeAreaView>
 
       {busy && (
@@ -267,32 +269,32 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'space-between' },
   topPill: {
     alignSelf: 'center',
-    marginTop: 8,
-    backgroundColor: 'rgba(11,27,51,0.7)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    marginTop: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
     borderRadius: 999,
+    overflow: 'hidden',
   },
-  topPillText: { color: '#FFFFFF', fontWeight: '600' },
+  topPillText: { color: '#0B1B33', fontWeight: '600', letterSpacing: 0.2 },
   challengeBanner: {
     alignSelf: 'center',
-    marginTop: 12,
-    paddingHorizontal: 22,
-    paddingVertical: 14,
-    borderRadius: 18,
-    backgroundColor: 'rgba(11,27,51,0.86)',
+    marginTop: 16,
+    paddingHorizontal: 28,
+    paddingVertical: 18,
+    borderRadius: 24,
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    overflow: 'hidden',
   },
-  challengeBannerLabel: { color: '#7DD3FC', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  challengeBannerPrompt: { color: '#FFFFFF', fontSize: 22, fontWeight: '800' },
-  challengeBannerHint: { color: '#94A3B8', fontSize: 12 },
+  challengeBannerLabel: { color: '#0EA5E9', fontSize: 11, fontWeight: '800', letterSpacing: 1.4 },
+  challengeBannerPrompt: { color: '#0B1B33', fontSize: 26, fontWeight: '800', letterSpacing: -0.3 },
+  challengeBannerHint: { color: '#48566B', fontSize: 13 },
   panel: {
     margin: 12,
-    padding: 16,
-    borderRadius: 24,
-    backgroundColor: 'rgba(244,248,255,0.94)',
-    gap: 10,
+    padding: 20,
+    borderRadius: 28,
+    gap: 12,
+    overflow: 'hidden',
   },
   result: { fontSize: 16, fontWeight: '700', color: '#0B1B33' },
   logBox: { backgroundColor: '#0B1B33', borderRadius: 12, padding: 10, minHeight: 90 },
