@@ -76,7 +76,7 @@ takePhoto (JPEG, 720x960 target)
   └→ verified = matched AND satisfiesChallenge
 ```
 
-All times measured on iPhone 17 Pro Max (CPU EP, *functional-only*): YuNet ~13 ms, MiniFASNet ~2 ms, MobileFaceNet ~3 ms; E2E verify (including capture+decode+ multi-orientation detect) **~130 ms**. The C3 < 1 s number is graded on weak Android — pending Slice 5.
+All times measured on iPhone 17 Pro Max (CPU EP, *functional-only*): YuNet ~13 ms, MiniFASNet ~2 ms, MobileFaceNet ~3 ms; E2E verify (including capture+decode+ multi-orientation detect) **~130 ms**. The C3 < 1 s number is now measured on a real **Redmi 9 Power** (M2010J19SI, SD662): **~620 ms median verify** (582–931 ms, n=40, CPU EP) — comfortably under budget (D13/D14; `docs/benchmarks.md` §2).
 
 ## 4. Why no custom native code (D9)
 
@@ -87,7 +87,7 @@ We weighed two paths in Spike B:
 | **v1 — no custom native** (chosen) | Cross-platform free, retires schedule risk, leverages MIT libs (`fast-opencv`, `onnxruntime-react-native`, `expo-glass-effect`) | per-frame work goes through JSI/worklet rather than pure native C++; ORT runs on JS thread, which is fine for *on-demand* verify |
 | v2 — custom Nitro plugin | Truly all-native per frame; spec's purest path | iOS Swift/C++ + Android Kotlin/JNI, two integrations to maintain, biggest unknown in Spike B |
 
-The hard constraint (C3) targets *one* verify in <1 s, not per-frame recognition. So v1 wins on schedule + portability with no performance cost on the binding path. Path v2 is documented as the escalation if the Slice-5 Android benchmark misses C3 — but the architecture is platform-agnostic so the escalation is bounded.
+The hard constraint (C3) targets *one* verify in <1 s, not per-frame recognition. So v1 wins on schedule + portability with no performance cost on the binding path. Path v2 was documented as the escalation if the Android benchmark missed C3 — **but the real-device benchmark passed (~620 ms median on a Redmi 9 Power, 2026-05-30), so v1 stands and v2 is not needed.**
 
 ## 5. Why active gesture is the binding signal, passive is informational (D11)
 
@@ -156,7 +156,7 @@ TOTAL                   3.33 MB   ← 16.5% of the C2 20 MB ceiling
 
 | Open item | Why architecture is ready | When |
 |---|---|---|
-| Android < 1 s validation (C3) | Pipeline is platform-agnostic TS + cross-platform libs (Vision Camera 5, fast-opencv, ORT-RN). Only EP swap (NNAPI/XNNPACK) is platform-specific, behind config. | Slice 5 (Android device pending) |
+| ~~Android < 1 s validation (C3)~~ — **done 2026-05-30** | Full pipeline runs end-to-end on a Redmi 9 Power (M2010J19SI, SD662): **~620 ms median verify** (582–931 ms), CPU EP — under budget. Pipeline ported unchanged; a few screen-layer adaptations (D13/D14). EP swap (NNAPI/XNNPACK) is the next optimization. | ✅ validated on real hardware |
 | Accuracy gallery + threshold lock (C5) | `τ_match` is a single tunable, internal recognition is L2-normed → tuning is a one-number change. | Slice 5 |
 | Stronger passive liveness | `passiveLiveness()` is one function. Swap MiniFASNet for a fused two-model export per Silent-Face's original design, or a more recent model, without touching the rest. | Production |
 | Device-bound encryption key | `gallery.ts` reads `ENCRYPTION_KEY` from a constant today; swap for a function that pulls from `expo-secure-store` / Keychain / Keystore. | Production |

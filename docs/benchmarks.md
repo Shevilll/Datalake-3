@@ -25,8 +25,10 @@ End-to-end = detect → passive liveness → embed → match (one verify pass; e
 
 | Device | Class | EP | Detect | Liveness | Embed | Match | **E2E** | Rubric-valid? |
 |---|---|---|---|---|---|---|---|---|
-| ~3 GB Android (target) | mid-range | NNAPI/XNNPACK | _TBD_ | _TBD_ | _TBD_ | _TBD_ | **_TBD_** | ✅ **this is the C3 number** |
+| **Redmi 9 Power** (M2010J19SI, SD662) | mid-range budget | CPU (default) | — | — | — | — | **~620 ms median · 582–931 (n=40)** | ✅ **C3 number — met (< 1 s)** |
 | iPhone 17 Pro Max | flagship | CPU (default) | 13 ms | 2 ms | 3 ms | ~0 | **~128 ms** | ❌ functional check only |
+
+**Android rubric validation (Redmi 9 Power, 2026-05-30) — this is the C3 number.** The full pipeline now runs end-to-end on a real budget Qualcomm device (M2010J19SI, Snapdragon 662). Across **40 live verifies**, the in-app `latencyMs` (detect → liveness → embed → match, the same scope as the iPhone E2E figure and the value shown on-screen in the demo) measured **median ~620 ms, range 582–931 ms** on the **default CPU EP** — worst case comfortably under the 1 s budget. The verified demo shot (`androidDemo/IMG_5719`) shows `590 ms` on-screen. Per-phase Android breakdown is not separately instrumented (only the aggregate is surfaced); camera snapshot + JPEG decode are additional and the user-paced active gesture is excluded. EP swap (NNAPI/XNNPACK) is the next lever to push this down further. Same flow validated: detection, all three active challenges (left/right/smile + bonus blink), ✅ verify (cos 0.73–0.87), and ❌ challenge-failed — all captured in `androidDemo/`.
 
 **Slice 1 live verify (iPhone, 2026-05-28):** full register→verify on-device measured **~126–137 ms** end-to-end (JPEG decode + orientation-correct + detect + align + embed + match; single-shot, unoptimized — full-res 3088×2316 capture, no int8, default CPU EP). Detection 0.91–0.95. Same-person cosine ranged **0.44–0.84** across pose/expression on a single enrollment; one hard-angle shot dipped to **0.32** (false reject at τ=0.4) → multi-shot enrollment (match-against-max, already implemented) raises the floor; final τ_match tuned on the gallery (Slice 5). Different-context shots sat near **0.0–0.32** (correctly rejected). Purge verified live.
 

@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   onnxruntime-react-native@1.24.3:
-    hash: 59b9818e92036e4c6fbfd426003b2737a58acc37dc9d6049c0c4e30c8646d97c
+    hash: 847fd45ca2e448c13ca7525f07f26f503cb5e124dab1b6e9d799f47cb7b5f410
     path: patches/onnxruntime-react-native@1.24.3.patch
 
 importers:
@@ -63,7 +63,7 @@ importers:
         version: 56.0.5(expo@56.0.8)(react-native@0.85.3(@babel/core@7.29.7)(@react-native/metro-config@0.85.3(@babel/core@7.29.7))(@types/react@19.2.15)(react@19.2.3))
       onnxruntime-react-native:
         specifier: ^1.24.3
-        version: 1.24.3(patch_hash=59b9818e92036e4c6fbfd426003b2737a58acc37dc9d6049c0c4e30c8646d97c)(react-native@0.85.3(@babel/core@7.29.7)(@react-native/metro-config@0.85.3(@babel/core@7.29.7))(@types/react@19.2.15)(react@19.2.3))(react@19.2.3)
+        version: 1.24.3(patch_hash=847fd45ca2e448c13ca7525f07f26f503cb5e124dab1b6e9d799f47cb7b5f410)(react-native@0.85.3(@babel/core@7.29.7)(@react-native/metro-config@0.85.3(@babel/core@7.29.7))(@types/react@19.2.15)(react@19.2.3))(react@19.2.3)
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -7590,7 +7590,7 @@ snapshots:
 
   onnxruntime-common@1.24.3: {}
 
-  onnxruntime-react-native@1.24.3(patch_hash=59b9818e92036e4c6fbfd426003b2737a58acc37dc9d6049c0c4e30c8646d97c)(react-native@0.85.3(@babel/core@7.29.7)(@react-native/metro-config@0.85.3(@babel/core@7.29.7))(@types/react@19.2.15)(react@19.2.3))(react@19.2.3):
+  onnxruntime-react-native@1.24.3(patch_hash=847fd45ca2e448c13ca7525f07f26f503cb5e124dab1b6e9d799f47cb7b5f410)(react-native@0.85.3(@babel/core@7.29.7)(@react-native/metro-config@0.85.3(@babel/core@7.29.7))(@types/react@19.2.15)(react@19.2.3))(react@19.2.3):
     dependencies:
       onnxruntime-common: 1.24.3
       react: 19.2.3

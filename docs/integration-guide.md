@@ -35,8 +35,14 @@ FaceAuth.setCaptureProvider(async (challenge) => {
     // VERIFY path: show the prompt to the user and wait for them to perform the gesture
     await showChallengePromptAndWaitForCapture(challenge);
   }
-  const photo = await photoOutput.capturePhotoToFile({ flashMode: 'off' }, {});
-  const { mat, width, height } = await photoToMat(photo.filePath);
+  // Capture a frame as a JPEG, then decode to an OpenCV Mat. The capture *mechanism* is
+  // platform-specific (D14) — the FaceAuth contract is not. On Android the front-camera HAL
+  // can't configure VisionCamera's preview+photo stream combo, so capture the preview frame
+  // via `cameraRef.current.takeSnapshot()` + `image.saveToFileAsync(path, 'jpg')`; on iOS use
+  // the photo output (`photoOutput.capturePhotoToFile(...)`). Either way you produce a JPEG
+  // path to hand to `photoToMat`. See `src/app/index.tsx` → `capture()` for the reference impl.
+  const jpegPath = await captureJpegPath(); // platform-appropriate: snapshot on Android, photo on iOS
+  const { mat, width, height } = await photoToMat(jpegPath);
   return { mat, width, height } satisfies CapturedFace;
 });
 return () => FaceAuth.setCaptureProvider(null); // cleanup on unmount

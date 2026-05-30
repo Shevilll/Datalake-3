@@ -15,3 +15,73 @@ index 41b43599a9af6ef1c170047d39db1f3baa6ca682..7ab039cc963ba7c7022aa7d8e7f24c6c
      extractLibs "com.facebook.fbjni:fbjni:+:headers"
      extractLibs "com.facebook.fbjni:fbjni:+"
    }
+diff --git a/dist/commonjs/binding.js b/dist/commonjs/binding.js
+index b5ca0ca7b9410444fe728df7e7eb2a0b30ebe58d..734108dc93125475ed472f38c752e50a366ef7c7 100644
+--- a/dist/commonjs/binding.js
++++ b/dist/commonjs/binding.js
+@@ -8,8 +8,11 @@ var _reactNative = require("react-native");
+ // Copyright (c) Microsoft Corporation. All rights reserved.
+ // Licensed under the MIT License.
+ 
+-const Module = exports.Module = _reactNative.NativeModules.Onnxruntime;
++const Module = exports.Module = _reactNative.TurboModuleRegistry.get('Onnxruntime') ?? _reactNative.NativeModules.Onnxruntime;
+ if (typeof globalThis.OrtApi === 'undefined') {
++  if (Module == null) {
++    throw new Error('onnxruntime-react-native: native module "Onnxruntime" not found. ' + 'Ensure the package is autolinked and the app was rebuilt.');
++  }
+   Module.install();
+ }
+ const OrtApi = exports.OrtApi = globalThis.OrtApi ?? new Proxy({}, {
+diff --git a/dist/module/binding.js b/dist/module/binding.js
+index e1bca3ac5cca3213c7fbf3becce2d4d24824127a..912d81611f8be039f06c706176e7abffa692aa86 100644
+--- a/dist/module/binding.js
++++ b/dist/module/binding.js
+@@ -3,9 +3,12 @@
+ // Copyright (c) Microsoft Corporation. All rights reserved.
+ // Licensed under the MIT License.
+ 
+-import { NativeModules } from 'react-native';
+-export const Module = NativeModules.Onnxruntime;
++import { NativeModules, TurboModuleRegistry } from 'react-native';
++export const Module = TurboModuleRegistry.get('Onnxruntime') ?? NativeModules.Onnxruntime;
+ if (typeof globalThis.OrtApi === 'undefined') {
++  if (Module == null) {
++    throw new Error('onnxruntime-react-native: native module "Onnxruntime" not found. ' + 'Ensure the package is autolinked and the app was rebuilt.');
++  }
+   Module.install();
+ }
+ export const OrtApi = globalThis.OrtApi ?? new Proxy({}, {
+diff --git a/lib/binding.ts b/lib/binding.ts
+index f5963a02e39c344a4de19d682c1b7c1e20ba8528..198b1b3aecae7419446a5dcf75bfbed381b3f4f9 100644
+--- a/lib/binding.ts
++++ b/lib/binding.ts
+@@ -1,16 +1,27 @@
+ // Copyright (c) Microsoft Corporation. All rights reserved.
+ // Licensed under the MIT License.
+ 
+-import { NativeModules } from 'react-native';
++import { NativeModules, TurboModuleRegistry } from 'react-native';
+ import type { OrtApi as OrtApiType } from './api';
+ 
+-export const Module = NativeModules.Onnxruntime;
++// Bridgeless New Architecture exposes legacy bridge modules only through the
++// TurboModule legacy-interop proxy (global.__turboModuleProxy). NativeModules.Onnxruntime
++// is `null` under bridgeless, so resolving it directly crashes with
++// "Cannot read property 'install' of null" at import time. TurboModuleRegistry.get tries
++// the interop proxy first and falls back to NativeModules, so it works on both architectures.
++export const Module = TurboModuleRegistry.get('Onnxruntime') ?? NativeModules.Onnxruntime;
+ 
+ declare global {
+   var OrtApi: OrtApiType; // eslint-disable-line no-var
+ }
+ 
+ if (typeof globalThis.OrtApi === 'undefined') {
++  if (Module == null) {
++    throw new Error(
++      'onnxruntime-react-native: native module "Onnxruntime" not found. ' +
++        'Ensure the package is autolinked and the app was rebuilt.',
++    );
++  }
+   Module.install();
+ }
+ 

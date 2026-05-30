@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -9,7 +10,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, useCameraDevice, useCameraPermission, usePhotoOutput } from 'react-native-vision-camera';
+import { StatusBar } from 'expo-status-bar';
+import * as FileSystem from 'expo-file-system/legacy';
+import { Camera, type CameraRef, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 
@@ -27,6 +30,14 @@ import { addEnrollment, listEnrolled } from '@/faceauth/gallery';
 import { loadSessions, type Sessions } from '@/faceauth/ort';
 import { enrollFromMat, verifyFromMat } from '@/faceauth/pipeline';
 
+// expo-glass-effect's <GlassView> renders the real iOS 26 Liquid Glass material only on
+// iOS 26+; everywhere else (Android, iOS <26) it degrades to a plain transparent <View>,
+// which would leave our panels invisible over the camera and read as "not light theme".
+// When the native glass is unavailable we paint the surfaces as solid light cards so the
+// light-theme layout still looks clean (CLAUDE.md §3c: "always provide the fallback look").
+// iOS 26 keeps pure glass untouched (GLASS_OFF is false there).
+const GLASS_OFF = !isLiquidGlassAvailable();
+
 type Status = 'booting' | 'ready' | 'error';
 
 // Face-guide oval sized off the screen width — large enough that the user fills it,
@@ -39,12 +50,7 @@ const OVAL_H = Math.round(OVAL_W * 1.28);
 export default function HomeScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('front');
-  // JPEG (OpenCV can't decode HEIC); capped resolution keeps full-image ops light.
-  const photoOutput = usePhotoOutput({
-    containerFormat: 'jpeg',
-    qualityPrioritization: 'speed',
-    targetResolution: { width: 720, height: 960 },
-  });
+  const cameraRef = useRef<CameraRef>(null);
 
   const [status, setStatus] = useState<Status>('booting');
   const [cameraReady, setCameraReady] = useState(false);
@@ -52,7 +58,12 @@ export default function HomeScreen() {
   const [name, setName] = useState('');
   // active-challenge verify flow: idle -> awaiting (user performs the prompted gesture) -> processing
   const [challenge, setChallenge] = useState<ActiveChallenge | null>(null);
-  const yawSignRef = useRef<1 | -1>(-1); // front-camera mirror: turning LEFT yields +yaw on this device, so flip
+  // Front-camera yaw sign differs by platform because the two capture paths mirror differently:
+  // iOS captures via the photo output (sign -1, calibrated on device), while Android captures the
+  // mirrored preview via takeSnapshot() (see `capture`), which flips horizontal direction — so a
+  // physical right-turn yields +yaw on Android and the sign must be +1. Measured on-device
+  // (Redmi, 2026-05-30): turning right gave raw yaw ≈ +0.37..+0.46. smile is mirror-invariant.
+  const yawSignRef = useRef<1 | -1>(Platform.OS === 'android' ? 1 : -1);
   const [enrolled, setEnrolled] = useState<string[]>([]);
   const [result, setResult] = useState<string>('');
   const sessionsRef = useRef<Sessions | null>(null);
@@ -78,10 +89,21 @@ export default function HomeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Capture via a preview snapshot rather than a dedicated ImageCapture output: this budget
+  // device's front camera cannot configure the preview+photo stream combination via CameraX
+  // ("Failed to apply the stream configuration for the given outputs"), but preview alone is
+  // fine. takeSnapshot() grabs the current preview frame (a single stream) and we persist it
+  // as a JPEG for the OpenCV decode path. Register and Verify both call this, so capture
+  // geometry (including front-camera mirroring) stays consistent between enroll and match.
   const capture = async (): Promise<{ path: string } | null> => {
-    const photo = await photoOutput.capturePhotoToFile({ flashMode: 'off' }, {});
-    log(`captured -> ${photo.filePath}`);
-    return { path: photo.filePath };
+    const cam = cameraRef.current;
+    if (cam == null) return null;
+    const image = await cam.takeSnapshot();
+    const dir = (FileSystem.cacheDirectory ?? '').replace('file://', '');
+    const path = `${dir}faceauth-capture-${Date.now()}.jpg`;
+    await image.saveToFileAsync(path, 'jpg', 92);
+    log(`snapshot -> ${path}`);
+    return { path };
   };
 
   const handleRegister = async (): Promise<void> => {
@@ -214,11 +236,14 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Light theme is locked (CLAUDE.md §3c) — force dark status-bar icons so they stay
+          legible against the bright backdrop on Android (no auto dark-mode inversion). */}
+      <StatusBar style="dark" />
       {device != null && hasPermission ? (
         <Camera
+          ref={cameraRef}
           style={StyleSheet.absoluteFill}
           device={device}
-          outputs={[photoOutput]}
           isActive
           onStarted={() => setCameraReady(true)}
           onStopped={() => setCameraReady(false)}
@@ -242,7 +267,7 @@ export default function HomeScreen() {
             A soft-white `tintColor` keeps the glass material readable when it lands over a dark
             backdrop (Dynamic Island, hair, low-light areas). Dark text + that tint = always legible. */}
         <GlassView
-          style={styles.topPill}
+          style={[styles.topPill, GLASS_OFF && styles.topPillFallback]}
           glassEffectStyle="regular"
           colorScheme="light"
           tintColor={PILL_TINT}
@@ -253,7 +278,7 @@ export default function HomeScreen() {
         {/* Challenge banner — only when a verify is awaiting the user's gesture. Floats above the
             face-guide oval so the prompt is visible while the user looks at the camera. */}
         {challenge !== null && (
-          <GlassView style={styles.challengeBanner} glassEffectStyle="regular" colorScheme="light">
+          <GlassView style={[styles.challengeBanner, GLASS_OFF && styles.cardFallback]} glassEffectStyle="regular" colorScheme="light">
             <Text style={styles.challengeBannerLabel}>
               {isBindingChallenge(challenge) ? 'ACTIVE LIVENESS' : 'BONUS LIVENESS'}
             </Text>
@@ -268,10 +293,10 @@ export default function HomeScreen() {
 
         {/* Bottom controls — compact glass card. Result feedback, name input, primary actions,
             secondary text links. The Verify button is the single restrained accent (primary). */}
-        <GlassView style={styles.panel} glassEffectStyle="regular" colorScheme="light">
+        <GlassView style={[styles.panel, GLASS_OFF && styles.cardFallback]} glassEffectStyle="regular" colorScheme="light">
           {result.length > 0 && <Text style={styles.result}>{result}</Text>}
 
-          <GlassView style={styles.inputGlass} glassEffectStyle="clear" colorScheme="light">
+          <GlassView style={[styles.inputGlass, GLASS_OFF && styles.inputFallback]} glassEffectStyle="clear" colorScheme="light">
             <TextInput
               style={styles.input}
               placeholder="Name to register"
@@ -288,7 +313,7 @@ export default function HomeScreen() {
               disabled={busy || status !== 'ready' || !cameraReady}
               style={({ pressed }) => [styles.btnWrap, (busy || pressed) && styles.btnWrapPressed]}
             >
-              <GlassView style={styles.btnGlass} glassEffectStyle="regular" colorScheme="light">
+              <GlassView style={[styles.btnGlass, GLASS_OFF && styles.btnSecondaryFallback]} glassEffectStyle="regular" colorScheme="light">
                 <Text style={styles.btnSecondaryText}>Register</Text>
               </GlassView>
             </Pressable>
@@ -301,7 +326,7 @@ export default function HomeScreen() {
                   `isInteractive` enables iOS 26's native glass press feedback (subtle morph + lift);
                   the `tintColor` paints the glass blue without flattening it to a solid block. */}
               <GlassView
-                style={styles.btnPrimaryGlass}
+                style={[styles.btnPrimaryGlass, GLASS_OFF && styles.btnPrimaryFallback]}
                 glassEffectStyle="regular"
                 tintColor={ACCENT}
                 isInteractive
@@ -455,4 +480,38 @@ const styles = StyleSheet.create({
   purgeText: { color: '#DC2626', fontWeight: '600', fontSize: 13 },
 
   busy: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
+
+  // ---- Glass fallback (Android / iOS <26) — solid light cards so the light theme reads
+  // cleanly where the native Liquid Glass material isn't available. Applied only when
+  // GLASS_OFF is true; iOS 26 keeps the real glass and ignores these entirely. ----
+  topPillFallback: {
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(11, 27, 51, 0.08)',
+  },
+  cardFallback: {
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(11, 27, 51, 0.08)',
+    // Soft elevation so the card lifts off the camera/background on Android.
+    shadowColor: '#0B1B33',
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  inputFallback: {
+    backgroundColor: 'rgba(244, 247, 252, 0.96)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(11, 27, 51, 0.12)',
+  },
+  btnSecondaryFallback: {
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(11, 27, 51, 0.14)',
+  },
+  // Primary action becomes a solid accent button when glass is unavailable.
+  btnPrimaryFallback: {
+    backgroundColor: ACCENT,
+  },
 });

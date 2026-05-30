@@ -44,7 +44,7 @@ Convert with: `marp deck.md -o deck.pptx` (or `-o deck.pdf`) using the Marp CLI.
 
 **One-line hook:** *Three models, **3.33 MB total**, runs entirely on-device — including liveness defense.*
 
-**Visual:** the iOS 26 Liquid Glass app screenshot (Register/Verify panel over live camera) — already captured during development. Plus a tiny logo or wordmark.
+**Visual:** the iOS 26 Liquid Glass home screen over live camera (`iosDemo/IMG_5666`) beside the Android verified result (`androidDemo/IMG_5719`) — same one app, both platforms, captured on real devices. Plus a tiny logo or wordmark.
 
 ---
 
@@ -74,8 +74,8 @@ NHAI field staff authenticate at remote sites with **no network**. Existing opti
 | Constraint | Target | Our number |
 |---|---|---|
 | Total model footprint | ≤ 20 MB | **3.33 MB** (int8 build) — 16.5% of target |
-| End-to-end verify (iPhone, functional) | — | **~130 ms** |
-| End-to-end verify (rubric Android) | < 1 s | _pending Android validation_ |
+| Verify pipeline latency (iPhone 17 Pro Max, functional) | — | **~130 ms** |
+| Verify pipeline latency (**Redmi 9 Power**, rubric-class Android) | < 1 s | **~620 ms median** (582–931 ms) — **C3 met ✓** |
 | Same-identity cosine separation margin | discriminative | **0.89–0.95** (sample faces, int8/fp32) |
 | On-device same-id cosine (live captures) | — | 0.79–0.86 across pose with multi-shot enrollment |
 | Liveness defense | photo + replay | **CSPRNG-randomized active gesture (binding)** — defeats both; passive MiniFASNet exposed as a transparency / extensibility hook (D11) |
@@ -120,9 +120,15 @@ NHAI field staff authenticate at remote sites with **no network**. Existing opti
 - **No custom Swift/Kotlin** in v1 — Vision Camera 5 + fast-opencv + ORT Runtime handle everything. Same RN + TS pipeline runs on both platforms.
 - **One TypeScript module** (`FaceAuth`) is the public surface. Internals can swap without breaking Datalake.
 
-**Cross-platform claim, made concrete:** every file under `src/faceauth/` (the entire pipeline — detection, alignment, embedding, matching, active liveness, gallery, sync) is **platform-agnostic TypeScript** with zero `Platform.OS` branches and no native imports. The Android port is a build artefact, not a rewrite. The one platform-specific knob is the **ONNX Runtime execution provider** — CPU EP on both today; CoreML (iOS) / NNAPI / XNNPACK (Android) can be enabled in a config swap if Slice 5 Android benchmarks need it.
+**Cross-platform claim, made concrete — now proven on real Android hardware.** The entire recognition pipeline under `src/faceauth/` (detection, alignment, embedding, matching, active liveness, gallery, sync) is **platform-agnostic TypeScript** with zero `Platform.OS` branches and no native imports — it ran unchanged on Android. Bringing up the real device surfaced a handful of small, documented adaptations confined to the **screen/capture layer** (never the pipeline):
 
-**Notes:** "By not writing a Nitro plugin ourselves, we kept the toolchain simple AND we get Android for free — same TS pipeline runs on both. The platform-specific surface is one config line per build."
+- **ORT autolinking (D13):** a stale `unimodule.json` in `onnxruntime-react-native` made Expo's autolinker skip its Android package → fixed with a one-file `react-native.config.js`.
+- **Capture path (D14):** this budget Qualcomm HAL rejects CameraX's preview+photo stream combination, so Android captures via a preview **snapshot** (single stream); iOS keeps the photo output.
+- **UI fallback + mirror (D14):** Liquid Glass degrades to solid light cards off iOS 26, and the front-camera mirror flips the head-turn yaw sign — both handled with small `Platform.OS` branches in the screen.
+
+The execution-provider knob (CPU EP today; CoreML / NNAPI / XNNPACK swappable per platform) stays a config line.
+
+**Notes:** "We didn't get Android 'for free' and won't claim we did — the pipeline ported unchanged, but a real budget device needed a few days of honest debugging at the screen layer (autolinking, a camera stream-combo limit, the glass fallback, a mirror flip). All documented in DECISIONS. The payoff: it runs end-to-end on a Redmi 9 Power, the rubric's hardware class — not a slideware claim."
 
 ---
 
@@ -158,17 +164,17 @@ A CSPRNG-randomized active gesture, picked unpredictably per verify from `headLe
 | Attack | Why it fails | Live demo |
 |---|---|---|
 | **Printed photo** of an enrolled subject | the photo cannot perform the prompted gesture on command — face matches, gesture fails | hold a printed photo to the camera → `Verify` → `❌ Challenge failed` on every attempt |
-| **Replayed video** of the subject sitting neutrally | the recording shows no gesture; the prompt is unpredictable per verify so the attacker can't pre-position the right gesture either | play a still-frame / neutral video on a second phone → `Verify` → `❌ Challenge failed` |
+| **Neutral / autonomously-playing replay** of the subject sitting still | the recording shows no gesture; an autonomously-looping clip can't respond to the per-verify prompt, so the prompted gesture never appears | play a still-frame / neutral video on a second phone → `Verify` → `❌ Challenge failed` |
 
 **Passive MiniFASNet — exposed as a transparency / extensibility hook, NOT a binding gate.** We measured the single MiniFASNet-V2 export on real iPhone-front-camera selfies and a 2D press photo from the same pipeline: it saturates to the same score on both — it doesn't discriminate on this device's camera distribution (D11, `docs/benchmarks.md` §4). We surface the score in `VerifyResult.passiveScore` for honesty and so a production deployment can drop in a stronger model (Silent-Face's two-model fused design, or a newer export) **without changing the FaceAuth contract or any other code**. Hard-gating on this single export would lock real users out — that's not a trade we'll defend.
 
-**Stronger replay guarantee already in the API:** `randomChallengeSequence(n)` raises per-attempt entropy to `n × log₂(3) ≈ 1.58n` bits. At `n=2` blind-guess success drops to **(1/3)² ≈ 11%** — wire when the deployment context wants it.
+**Honest scope of the active-only signal — and the mitigation already in the API.** Single-challenge (`n=1`) active liveness defeats a printed photo and any autonomously-playing replay. It does **not**, on its own, defeat a *human-operated* video that scrubs to the prompted gesture on cue (a recording of the subject turning + smiling, played back responsively). Our answer is `randomChallengeSequence(n)`, which raises per-attempt entropy to `n × log₂(3) ≈ 1.58n` bits and forces a *sequence* the operator can't pre-stage — at `n=2`, blind success drops to **(1/3)² ≈ 11%**. It's in the API today (wire per deployment), and the production roadmap adds two-model passive fusion (D11) as the texture-based backstop.
 
-**Notes:** "Most teams will ship active-only and not say so, OR hard-gate on passive without ever testing whether it discriminates. We did the test, kept passive in the pipeline as a transparency hook, and made active the binding signal that actually works. The demo will show printed-photo defeat and neutral-video-replay defeat — both fail on the gesture, not on a black-box score we can't justify."
+**Notes:** "Most teams will ship active-only and not say so, OR hard-gate on passive without ever testing whether it discriminates. We did the test, kept passive in the pipeline as a transparency hook, and made active the binding signal that actually works. We demo printed-photo defeat and neutral-replay defeat — both fail on the gesture. If a judge asks 'what about a video of me turning my head, played on cue?' — own it: that beats single-challenge active liveness, which is *exactly* why we built `randomChallengeSequence(n)` (n=2 → ~11% blind success) and why the roadmap adds two-model passive fusion. We don't pretend n=1 active is unbreakable; we show we engineered the next layer for it."
 
 ---
 
-## 7. Feasibility: ~130 ms on-device, validated on iPhone 17 Pro Max
+## 7. Feasibility: ~130 ms on iPhone (functional) · ~620 ms on rubric-class Android (C3 met)
 
 | Phase | Time |
 |---|---|
@@ -180,12 +186,18 @@ A CSPRNG-randomized active gesture, picked unpredictably per verify from `headLe
 | Cosine match against multi-shot gallery | ~0 |
 | **End-to-end verify (iPhone, CPU EP)** | **~130 ms** |
 
-**About the rubric Android number:**
-Per `CLAUDE.md` §0a, **iPhone latency is a functional check only**. The C3 < 1 s number must come from a real ~3 GB-RAM Android device — pending the Slice 5 validation pass (the iPhone is the dev/test device; the architecture is platform-agnostic so it ports as a build, not a rewrite).
+**The rubric Android number — measured, not pending.** Per `CLAUDE.md` §0a, the iPhone is a *functional* check only; the C3 number must come from real mid-range Android hardware. We ran the full pipeline on a **Redmi 9 Power (M2010J19SI, Snapdragon 662)** — a budget Qualcomm device in the C4 class:
 
-**Visual:** a small per-phase bar chart, with a clear callout "iPhone — functional check; Android = rubric number, pending."
+| Device | Verify pipeline (`latencyMs`) |
+|---|---|
+| iPhone 17 Pro Max (functional only) | ~130 ms |
+| **Redmi 9 Power** (rubric-class) | **median ~620 ms · range 582–931 ms** |
 
-**Notes:** "We're not going to claim <1 s on the flagship and pretend it's the rubric number. The honest engineering is: prove it on the iPhone, then validate on the real target. The pipeline is ready for both."
+40 live verifies, on-device, CPU EP. The on-screen latency in the demo (e.g. `590 ms` on the verified result, `androidDemo/`) is this exact metric. **Max observed 931 ms < the 1 s budget — C3 is met on the real target, not the flagship.**
+
+> Scope: detect → liveness → embed → match (the value the app surfaces as `latencyMs`). Camera capture + JPEG decode are additional, and the user-paced active gesture isn't counted — the **same scope** as the iPhone figure, so the two are directly comparable.
+
+**Notes:** "We said we wouldn't quote the flagship as the rubric number — so we didn't. We put the pipeline on a real budget Qualcomm phone and measured 40 verifies: 620 ms median, 931 ms worst case, under the second. The number on the slide is the number on the screen in the demo photos."
 
 ---
 
@@ -255,18 +267,18 @@ await FaceAuth.purgeLocal(); // wipes embeddings + queue + transmit log
 
 ## 11. Live demo
 
-**On the iPhone (airplane-mode capable):**
+**Runs on both platforms** — iPhone 17 Pro Max for the polished iOS 26 Liquid Glass demo, **Redmi 9 Power** for the rubric-class proof. Both are airplane-mode capable and both are captured end-to-end in `iosDemo/` and `androidDemo/` (register → all three challenges → ✅ verified → ❌ challenge-failed). The flow below is identical on each:
 
 1. **Register Ahmad** — capture 4–5 shots with slight pose variation (frontal, slight left, slight right, smile). Top pill shows "1 enrolled".
 2. **Verify** — tap → randomized challenge prompt appears in the Liquid Glass banner ("Turn slightly LEFT", "Smile", or occasionally the bonus "Blink twice"). Perform → Capture → result panel: `✅ Ahmad — verified (cos 0.8x, ~130 ms)` + a **Success** haptic. The bonus blink prompt makes the brief's full example list — blink/smile/turn — visibly covered (D12).
 3. **Defeat #1 — printed photo:** hold a printed photo of Ahmad to the camera → cosine matches the enrolled face BUT the flat photo can't perform the prompted gesture → `❌ Challenge failed`. Runs cleanly on every attempt regardless of which gesture the CSPRNG picks.
-4. **Defeat #2 — replayed neutral video:** play a still-frame / neutral-sitting video of Ahmad on a second phone → cosine matches BUT the recording shows no on-demand gesture → `❌ Challenge failed`. The CSPRNG randomization closes the predict-and-pre-record loophole.
+4. **Defeat #2 — replayed neutral video:** play a still-frame / neutral-sitting video of Ahmad on a second phone → cosine matches BUT the recording shows no on-demand gesture → `❌ Challenge failed`. Scope this honestly: this defeats an autonomously-playing replay. A *human-operated* video scrubbed to the prompted gesture can beat single-challenge active liveness — own it and point to `randomChallengeSequence(n)` (n=2 → ~11% blind success) + the two-model passive-fusion roadmap (D11) as the layered answer. Don't claim n=1 active is unbreakable.
 5. **Sanity check — directional intent:** turn the wrong way for the prompted challenge (e.g. prompt says "RIGHT", turn LEFT) → `❌ Challenge failed` even though identity matches. Demonstrates that the system enforces direction, not just movement.
 6. **Sync & Purge** (live from the bottom panel): tap **Sync queue** → mock POST payload prints in Metro (no raw images, just `id / personId / timestamp / matched / confidence / livenessPassed`). Tap **Purge all** → wipes the encrypted gallery + sync queue + transmit log in one call; subsequent verify returns no match.
 
 **Visual:** rehearsed; ~90 seconds. Have ready: (a) a printed photo of yourself for Defeat #1, (b) a second phone with a 10-sec neutral video of yourself for Defeat #2.
 
-**Notes:** "We've already iterated this loop dozens of times — the demo is what we've been running for two weeks."
+**Notes:** "We've already iterated this loop dozens of times — the demo is what we've been running for two weeks." **If asked 'could a video of you turning your head beat this?'** — answer directly: "Yes, a human-operated video scrubbed to the prompted gesture beats single-challenge active liveness — that's a known limit of active-only, and we don't hide it. We built `randomChallengeSequence(n)` for exactly that (n=2 → ~11% blind success), and the production roadmap adds two-model passive fusion as the texture backstop. We chose to ship the honest, working binding signal rather than hard-gate on a passive export we measured as non-discriminating (D11)."
 
 ---
 
@@ -277,16 +289,18 @@ await FaceAuth.purgeLocal(); // wipes embeddings + queue + transmit log
 | # | What we changed and why |
 |---|---|
 | D8 | Exported our own MIT MobileFaceNet because every clean small ArcFace ONNX traced to non-commercial weights (C6). |
-| D9 | Skipped a custom Nitro plugin for v1 — Vision Camera 5 + fast-opencv + ORT-RN proved sufficient, retiring schedule risk *and* keeping Android free. |
+| D9 | Skipped a custom Nitro plugin for v1 — Vision Camera 5 + fast-opencv + ORT-RN proved sufficient, retiring schedule risk and keeping the Android port a build + real-device bring-up (D13/D14), not a rewrite. |
 | D10 | CSPRNG-based challenge selection (anti-replay prediction); native polyfill batched. |
 | D11 | Measured the single MiniFASNet export on real iPhone selfies AND 2D photos — it saturates regardless of input, so it's not a discriminator on this device's camera distribution. Removed it as a binding gate; kept it in the pipeline as a transparency / extensibility hook exposed via `VerifyResult.passiveScore` for production to drop in a stronger fused passive model without touching the FaceAuth contract. |
 | D12 | Added blink as a NON-BINDING bonus challenge so all three brief examples (blink/smile/turn) are visible, without risking a false-reject on stage from a noisy single-shot proxy that YuNet's 5 landmarks can't really support. |
+| D13 | First-ever Android build crashed at launch: `onnxruntime-react-native`'s stale `unimodule.json` made Expo's autolinker skip its native package (module absent under bridgeless New Arch). Fixed with a one-file `react-native.config.js` + a `TurboModuleRegistry`-based ORT binding patch. Diagnosed from on-device logcat, not guesswork. |
+| D14 | Android runtime bring-up on a real Redmi 9 Power: snapshot-based capture (the budget Qualcomm HAL can't configure CameraX's preview+photo stream combo), Liquid-Glass→solid-light-card fallback off iOS 26, and a platform-specific yaw-sign flip for the mirrored front-camera preview. |
 
 **Roadmap (production):**
 
 - ~~Encrypted MMKV-backed gallery + haptics + CSPRNG polyfill~~ — **shipped** in build `931044c`.
 - ~~int8 quantization locked + bundled (1.36 MB recognition; 3.33 MB total)~~ — **shipped** 2026-05-28 (D4 lock).
-- **Android rubric validation** on a real ~3 GB device + EP swap (NNAPI / XNNPACK).
+- ~~Android rubric validation on real hardware~~ — **shipped** 2026-05-30: full pipeline runs end-to-end on a Redmi 9 Power, ~620 ms median verify (D13/D14). Next: EP swap (NNAPI / XNNPACK) to push the budget-device latency down further.
 - **Pose-robust recognition** (e.g., a swap to a larger MobileFaceNet variant) → expand the active-challenge set back to all three with confidence.
 - **Two-model passive fusion** per Silent-Face's original design to make passive a true binding signal.
 
@@ -300,7 +314,7 @@ await FaceAuth.purgeLocal(); // wipes embeddings + queue + transmit log
 
 **Repo:** [github / your-url-here]  (full source · DECISIONS.md · LICENSES.md · integration guide · benchmarks)
 
-**Headline once more:** three models · 3.33 MB · ~130 ms on iPhone · one TypeScript contract · open-source license-clean · offline-first by design.
+**Headline once more:** three models · 3.33 MB · ~130 ms iPhone / **~620 ms on a rubric-class Redmi 9 Power** · one TypeScript contract · open-source license-clean · offline-first, proven on **both** platforms.
 
 **Visual:** clean closing slide; QR or short URL to the repo.
 
@@ -322,11 +336,21 @@ await FaceAuth.purgeLocal(); // wipes embeddings + queue + transmit log
 
 Q&A: 2–3 minutes after.
 
-## Suggested visuals to capture before submission
+## Demo screenshots — captured on real devices (`iosDemo/` + `androidDemo/`)
 
-1. App screenshot of the Liquid Glass home screen with the camera preview (already captured).
-2. App screenshot of an active challenge prompt mid-flow ("Turn slightly LEFT").
-3. App screenshot of `✅ verified` result.
-4. App screenshot of `🛑 Spoof blocked` / `❌ Challenge failed` (defeat shot).
-5. (Optional) A short 10-second screen recording of the full register→verify loop, looped in Slide 11.
-6. The headline-numbers table (3.33 MB · ~130 ms · 0.95) as a hero card on Slide 3.
+The full register → challenge → verify → fail loop is captured on **both** platforms. Place an iOS + Android pair side-by-side per beat to make the cross-platform claim visual:
+
+| Beat | iOS (Liquid Glass) | Android (light-card fallback) |
+|---|---|---|
+| Home / camera ready | `iosDemo/IMG_5666` | `androidDemo/IMG_5700` |
+| Active challenge — Turn RIGHT | `iosDemo/IMG_5673` | `androidDemo/IMG_5703` / `IMG_5710` |
+| Active challenge — Turn LEFT | `iosDemo/IMG_5694` | `androidDemo/IMG_5706` |
+| Active challenge — Smile | — | `androidDemo/IMG_5717` |
+| ✅ Verified (id + cos + ms) | `iosDemo/` (verified shot) | **`androidDemo/IMG_5719`** — `✅ Ahmad Faraz · cos 0.733 · 590 ms` |
+| ❌ Challenge failed (defeat) | `iosDemo/` (defeat shot) | `androidDemo/IMG_5713` (590 ms) / `IMG_5715` (605 ms) |
+
+Notes for the deck build:
+- The **Android verified shot (`IMG_5719`)** is the single most valuable slide asset: it shows the rubric-class device, light theme, a real cosine, and the **590 ms** latency on-screen — evidence for C1/C3/C5 in one frame.
+- iOS shots show real iOS 26 Liquid Glass **in airplane mode** (status bar) — offline proof.
+- Android `screencap` renders the camera preview black, so the `androidDemo/` shots are phone-screen photos — that's expected and fine.
+- Still want a hero card on Slide 3: the headline numbers (3.33 MB · ~620 ms Android · 0.95).

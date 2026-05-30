@@ -9,11 +9,11 @@
 | Constraint | Target | Current |
 |---|---|---|
 | Total model footprint (C2) | ≤ 20 MB (smaller is better) | **3.33 MB** (int8 build, all 3 models) |
-| End-to-end verify latency (C3) | < 1 s on mid-range device | **~130 ms** on iPhone 17 Pro Max (flagship, *functional check only*) — Android rubric number pending Slice 5 |
+| End-to-end verify latency (C3) | < 1 s on mid-range device | **~620 ms median** (582–931 ms, n=40) on a **Redmi 9 Power** (M2010J19SI, SD662 — rubric-class) — **C3 met**; iPhone 17 Pro Max ~130 ms is a functional check only |
 | Recognition discriminativeness | > 95% | sample-face separation margin **0.95** (fp32) / **0.89** (int8); on-device same-id cosine **0.79–0.86** across pose with multi-shot enrollment |
 | Liveness (C7) | offline anti-spoofing | active gesture challenge (`headLeft / headRight / smile` binding + `blink` bonus, CSPRNG-randomized per verify); passive MiniFASNet logged informationally |
 | License (C6) | open-source only, no additional licenses | YuNet **MIT**, MiniFASNet-V2 **Apache-2.0**, recognition **MIT** (our exported MobileFaceNet) |
-| Cross-platform (C1) | iOS + Android, one codebase | Expo SDK 56 + RN 0.85 New Arch — no custom native (Vision Camera 5 + fast-opencv + ORT-RN) |
+| Cross-platform (C1) | iOS + Android, one codebase | Expo SDK 56 + RN 0.85 New Arch — no custom native (Vision Camera 5 + fast-opencv + ORT-RN). **Runs end-to-end on both iOS (iPhone 17 Pro Max) and Android (Redmi 9 Power)** — pipeline is platform-agnostic TS; a few screen-layer adaptations (capture, glass fallback, mirror) per D13/D14 |
 
 The full table lives in [`docs/benchmarks.md`](docs/benchmarks.md).
 
