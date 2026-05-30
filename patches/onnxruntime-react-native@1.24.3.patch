@@ -1,0 +1,17 @@
+diff --git a/android/build.gradle b/android/build.gradle
+index 41b43599a9af6ef1c170047d39db1f3baa6ca682..7ab039cc963ba7c7022aa7d8e7f24c6c3610d394 100644
+--- a/android/build.gradle
++++ b/android/build.gradle
+@@ -247,7 +247,11 @@ dependencies {
+     extractLibs "com.microsoft.onnxruntime:onnxruntime-android:latest.integration@aar"
+   }
+ 
+-  if (VersionNumber.parse(REACT_NATIVE_VERSION) < VersionNumber.parse("0.71")) {
++  // Gradle 9 removed org.gradle.util.VersionNumber; compute the RN <0.71 check without it.
++  def rnVersionParts = REACT_NATIVE_VERSION.replaceAll('[^0-9.]', '').tokenize('.')
++  def rnMajor = rnVersionParts.size() > 0 ? rnVersionParts[0].toInteger() : 0
++  def rnMinor = rnVersionParts.size() > 1 ? rnVersionParts[1].toInteger() : 0
++  if (rnMajor == 0 && rnMinor < 71) {
+     extractLibs "com.facebook.fbjni:fbjni:+:headers"
+     extractLibs "com.facebook.fbjni:fbjni:+"
+   }
