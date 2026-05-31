@@ -30,6 +30,6 @@ Sizes here feed `docs/benchmarks.md` and the footprint slide (C2, target ~7–8 
 > ⚠️ Color order differs by model (liveness=BGR, recognition=RGB). Verify normalization against the *specific* export with the harness — some recognition exports use `/255` instead of `(x-127.5)/128`.
 
 ## Open items
-- [ ] Download YuNet, MiniFASNet-V2, recognition exports; fill in commit/hash/size/license above.
+- [ ] Download YuNet, MiniFASNet-V2, recognition exports; fill in commit/hash/size/license above 
 - [ ] Confirm recognition-weights provenance is permissive (see `LICENSES.md` risk note). If not, swap for a cleanly-licensed MobileFaceNet.
-- [ ] Run `python harness/verify_models.py --introspect` and reconcile reported IO shapes with the recipes above.
+- [ ] Run `python harness/verify_models.py --introspect` and reconcile reported IO shapes with  he recipes above.

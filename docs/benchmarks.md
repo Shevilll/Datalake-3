@@ -1,7 +1,7 @@
 # Benchmarks
 
 > These numbers go straight onto the pitch slides. Fill them as they become **measured** (not estimated).
-> **Rule (CLAUDE.md §0a):** the C3 `<1 s` latency number is the one measured on a **real ~3 GB-RAM Android device**.
+> **Rule:** the C3 `<1 s` latency number is the one measured on a **real ~3 GB-RAM Android device**.
 > iPhone 17 Pro Max numbers are a *functional* check only and are reported separately, clearly labelled.
 
 ## 1. Model footprint (C2 — target ~7–8 MB, ceiling ~20 MB)

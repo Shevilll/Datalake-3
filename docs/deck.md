@@ -186,7 +186,7 @@ A CSPRNG-randomized active gesture, picked unpredictably per verify from `headLe
 | Cosine match against multi-shot gallery | ~0 |
 | **End-to-end verify (iPhone, CPU EP)** | **~130 ms** |
 
-**The rubric Android number — measured, not pending.** Per `CLAUDE.md` §0a, the iPhone is a *functional* check only; the C3 number must come from real mid-range Android hardware. We ran the full pipeline on a **Redmi 9 Power (M2010J19SI, Snapdragon 662)** — a budget Qualcomm device in the C4 class:
+**The rubric Android number — measured, not pending.** The iPhone is a *functional* check only; the C3 number must come from real mid-range Android hardware. We ran the full pipeline on a **Redmi 9 Power (M2010J19SI, Snapdragon 662)** — a budget Qualcomm device in the C4 class:
 
 | Device | Verify pipeline (`latencyMs`) |
 |---|---|

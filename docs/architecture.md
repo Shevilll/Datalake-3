@@ -164,7 +164,7 @@ TOTAL                   3.33 MB   ← 16.5% of the C2 20 MB ceiling
 
 ## 11. References
 
-- [`../CLAUDE.md`](../CLAUDE.md) — the engineering spec we were graded against.
+- [`../DECISIONS.md`](../DECISIONS.md) — the engineering spec and decisions log.
 - [`../DECISIONS.md`](../DECISIONS.md) — every non-obvious choice, dated.
 - [`integration-guide.md`](integration-guide.md) — how to use it.
 - [`benchmarks.md`](benchmarks.md) — measured numbers.

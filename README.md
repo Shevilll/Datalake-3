@@ -47,10 +47,8 @@ Open the **Datalake FaceAuth** app on the device. Models load offline from the b
 ## Layout
 
 ```
-/CLAUDE.md                  ← engineering spec (the brief — read this for context)
 /DECISIONS.md               ← every non-obvious choice + the deviations, dated
 /LICENSES.md                ← every dependency + permissive license check (C6)
-/HACKATHON-7_0-BRIEF.md     ← the verbatim problem statement
 /README.md                  ← this file
 /docs/
   benchmarks.md             ← footprint / latency / accuracy / liveness

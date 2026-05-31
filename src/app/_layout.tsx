@@ -6,7 +6,7 @@ import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 
 /**
  * Root layout — single screen (the FaceAuth camera). No tab bar (we removed the template's
- * Home/Explore tabs since we ship one screen). Theme is locked to light (CLAUDE.md §3c).
+ * Home/Explore tabs since we ship one screen). Theme is locked to light.
  */
 export default function RootLayout() {
   return (

@@ -51,3 +51,11 @@ __pycache__/
 # scaffold leftover
 example
 .claude/scheduled_tasks.lock
+
+# Internal dev config — not part of the submission
+CLAUDE.md
+AGENTS.md
+HACKATHON-7_0-BRIEF.md
+.claude/
+FaceAuth_Hackathon_Deck.pptx
+~$*.pptx

@@ -1,5 +1,5 @@
 /**
- * EXACT preprocessing recipes (CLAUDE.md §4) — the TS mirror of harness/verify_models.py.
+ * EXACT preprocessing recipes — the TS mirror of harness/verify_models.py.
  * These constants are load-bearing: a wrong crop margin, color order, or normalization
  * silently destroys accuracy with no error. This file is the single source of truth for
  * the native/worklet pipeline; if it disagrees with verify_models.py, ONE of them is wrong.

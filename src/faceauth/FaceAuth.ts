@@ -1,5 +1,5 @@
 /**
- * FaceAuth — the public integration contract (CLAUDE.md §8).
+ * FaceAuth — the public integration contract for Datalake 3.0.
  *
  * This is what Datalake 3.0 calls. It composes:
  *   - the inference pipeline (detect / align / embed / passive liveness)

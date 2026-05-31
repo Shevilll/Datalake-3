@@ -34,7 +34,7 @@ import { enrollFromMat, verifyFromMat } from '@/faceauth/pipeline';
 // iOS 26+; everywhere else (Android, iOS <26) it degrades to a plain transparent <View>,
 // which would leave our panels invisible over the camera and read as "not light theme".
 // When the native glass is unavailable we paint the surfaces as solid light cards so the
-// light-theme layout still looks clean (CLAUDE.md §3c: "always provide the fallback look").
+// light-theme layout still looks clean — always provide the fallback look.
 // iOS 26 keeps pure glass untouched (GLASS_OFF is false there).
 const GLASS_OFF = !isLiquidGlassAvailable();
 
@@ -236,7 +236,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Light theme is locked (CLAUDE.md §3c) — force dark status-bar icons so they stay
+      {/* Light theme is locked — force dark status-bar icons so they stay
           legible against the bright backdrop on Android (no auto dark-mode inversion). */}
       <StatusBar style="dark" />
       {device != null && hasPermission ? (
