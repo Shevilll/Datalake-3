@@ -4,6 +4,14 @@
 >
 > One React Native codebase. Three ONNX models. **~3.3 MB total.** Zero network at inference time.
 
+<p align="center">
+  <img alt="Platform: iOS + Android" src="https://img.shields.io/badge/Platform-iOS%20%2B%20Android-3DDC84?logo=react&logoColor=white">
+  <img alt="Expo SDK 56" src="https://img.shields.io/badge/Expo-SDK%2056-000020?logo=expo&logoColor=white">
+  <img alt="Models: 3 ONNX · 3.3 MB" src="https://img.shields.io/badge/Models-3%20ONNX%20%C2%B7%203.3%20MB-005CED?logo=onnx&logoColor=white">
+  <img alt="Verify latency ~620 ms" src="https://img.shields.io/badge/Verify-~620%20ms-orange">
+  <img alt="0 network at inference" src="https://img.shields.io/badge/Inference-0%20network-critical">
+</p>
+
 ## Headline numbers
 
 | Constraint | Target | Current |
